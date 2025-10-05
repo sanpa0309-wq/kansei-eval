@@ -1,8 +1,8 @@
 /* ===== 固定値（スマホでズレない前提） ===== */
 :root {
-  --pill: 34px;         /* 丸ボタン直径（0-6） */
-  --gap: 8px;           /* ボタン間隔 */
-  --scale-width: calc(var(--pill) * 7 + var(--gap) * 6); /* 中央列の総幅を厳密固定 */
+  --pill: 34px;         
+  --gap: 8px;           
+  --scale-width: calc(var(--pill) * 7 + var(--gap) * 6); 
 }
 
 body {
@@ -53,45 +53,47 @@ body {
 /* ===== スケール行：1段目=左右ラベル／2段目=○（○は固定幅グリッド） ===== */
 .row--grid{
   display: grid;
-  grid-template-columns: minmax(0,1fr) var(--scale-width) minmax(0,1fr); /* 中央幅は固定、左右は可変 */
-  grid-template-rows: auto auto;  /* 1段目=ラベル, 2段目=○ */
+  grid-template-columns: 1fr var(--scale-width) 1fr;
+  grid-template-rows: auto auto;
   align-items: center;
-  row-gap: 4px;                   /* ラベルと○の距離は最小 */
-  margin: 18px 0;                 /* 各評価行の間隔 */
-  border-bottom: 1px dashed #ccc; /* 区切り線 */
+  row-gap: 4px;
+  margin: 18px 0;
+  border-bottom: 1px dashed #ccc;
   padding-bottom: 14px;
 }
 .row--grid:last-of-type { border-bottom: none; }
 
-/* 1段目：左右ラベル（折り返しOK・中央列に影響なし） */
+/* 1段目：左右ラベル（端ぞろえ＋折り返しOK） */
 .label-left {
   grid-column: 1; grid-row: 1;
-  justify-self: end;
-  padding-right: 10px;
-  font-size: 14px;
-  line-height: 1.3;
-  white-space: normal;            /* 折り返し可 */
-  word-break: keep-all;
-}
-.label-right {
-  grid-column: 3; grid-row: 1;
-  justify-self: start;
-  padding-left: 10px;
+  justify-self: start;              /* ← 左端揃え */
+  padding-left: 4px;
   font-size: 14px;
   line-height: 1.3;
   white-space: normal;
   word-break: keep-all;
+  text-align: left;                 /* ← テキストも左揃え */
+}
+.label-right {
+  grid-column: 3; grid-row: 1;
+  justify-self: end;                /* ← 右端揃え */
+  padding-right: 4px;
+  font-size: 14px;
+  line-height: 1.3;
+  white-space: normal;
+  word-break: keep-all;
+  text-align: right;                /* ← テキストも右揃え */
 }
 
 /* 2段目：○（中央列固定幅。7等分グリッドで位置を完全固定） */
 .btn-scale{
   grid-column: 2; grid-row: 2;
-  width: var(--scale-width);      /* 幅を厳密固定 */
+  width: var(--scale-width);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(7, var(--pill)); /* 0〜6の各位置を完全固定 */
+  grid-template-columns: repeat(7, var(--pill));
   column-gap: var(--gap);
-  justify-content: center;        /* 横中央に配置 */
+  justify-content: center;
 }
 
 /* 丸ボタン（0〜6） */
@@ -109,7 +111,6 @@ body {
 /* ===== セグメントボタン（性別・年齢・グループ）===== */
 .seg-row { display:flex; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px; }
 .seg-label { font-weight:500; min-width:60px; }
-/* 横書き固定（縦書きの影響を遮断） */
 .seg-row, .seg-label, .seg-wrap, .seg-pill, .seg-pill * {
   writing-mode: horizontal-tb !important;
   text-orientation: mixed !important;
@@ -138,10 +139,10 @@ body {
 .btn-secondary:hover{ background:#d1d5db; }
 .btn-ghost{ background:none; color:#2563eb; font-size:13px; }
 
-/* ===== スマホ最適化（極小画面での安全側） ===== */
+/* ===== スマホ最適化 ===== */
 @media (max-width: 480px) {
   :root {
-    --pill: 28px;   /* さらに少し小さくして中央幅を確実に収める */
+    --pill: 28px;
     --gap: 6px;
     --scale-width: calc(var(--pill) * 7 + var(--gap) * 6);
   }
