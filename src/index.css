@@ -1,0 +1,138 @@
+:root {
+  --radius: 12px;
+  --gap: 12px;
+  --fg: #111;
+  --muted: #555;
+  --line: #eaeaea;
+  --bg: #ffffff;
+  --primary: #2563eb;
+}
+
+html, body, #root { height: 100%; }
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  color: var(--fg); background: var(--bg); margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* レイアウト */
+.page {
+  max-width: 960px; margin: 0 auto;
+  padding: 12px clamp(12px, 4vw, 20px) calc(72px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.topbar { margin: 16px 0 12px; }
+.title { font-size: clamp(18px, 5vw, 22px); margin: 0 0 6px; }
+.subtitle { font-size: 14px; margin: 0; color: var(--muted); }
+
+/* カード */
+.card {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px; margin-bottom: 14px; background: #fafafa;
+}
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; gap: 8px; font-size: 14px;
+}
+
+/* 画像 */
+.img-wrap { display: grid; place-items: center; min-height: 120px; overflow: hidden; }
+.stimulus {
+  height: auto; max-width: min(96vw, 900px); max-height: 55vh;
+  object-fit: contain; display: block; border-radius: 8px;
+}
+
+/* ガイド（0 と 6 の真上） */
+.scale-head.global {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  align-items: center; gap: 8px;
+  margin: 4px 0 8px;
+}
+.head-grid {
+  grid-column: 2;
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  align-items: center;
+}
+.head-left  { grid-column: 1; text-align: center; font-size: 12px; color: #666; white-space: nowrap; }
+.head-right { grid-column: 7; text-align: center; font-size: 12px; color: #666; white-space: nowrap; }
+
+/* 評価スケール：左語 / 7等分ボタン / 右語 */
+.row--grid {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  align-items: center; gap: 8px; margin: 8px 0;
+}
+.label-left, .label-right { font-size: 15px; text-align: center; white-space: nowrap; }
+
+/* 7等分（評価ボタン用） */
+.btn-scale {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 8px; align-items: center;
+}
+
+/* === ボタン共通 === */
+.pill {
+  /* ※ width:100% を外し、セグメントには自動幅、評価ボタンには下で個別指定 */
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid #dcdcdc;
+  background-color: #ffffff;
+  color: #333;
+  font-size: 16px;
+  padding: 6px 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+  opacity: 1;
+}
+.pill--active {
+  background-color: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary);
+  opacity: 1 !important;
+}
+.pill:active { filter: brightness(0.95); }
+.pill:focus-visible { outline: 2px solid #94b6ff; outline-offset: 2px; }
+
+/* 評価ボタンだけはセル幅いっぱいに（7等分を等間隔に見せる） */
+.btn-scale .pill { width: 100%; padding-left: 0; padding-right: 0; }
+
+/* ===== セグメント（性別・年齢）を横並びに ===== */
+.seg-row { margin: 10px 0; }
+.seg-label { font-size: 14px; margin-bottom: 6px; }
+.seg-wrap {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.seg-pill {
+  /* セグメントは自然な横並びにするため幅は自動 */
+  width: auto;
+  padding: 8px 14px;
+}
+
+/* 送信バー（固定） */
+.submit-bar {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  padding: 10px calc(14px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
+  background: rgba(255,255,255,0.95); backdrop-filter: blur(6px);
+  border-top: 1px solid var(--line);
+  display: flex; gap: 10px; justify-content: center;
+}
+.btn-primary, .btn-secondary {
+  min-height: 44px; padding: 10px 16px; border-radius: 12px;
+  font-size: 16px; cursor: pointer; touch-action: manipulation;
+}
+.btn-primary { border: none; background: var(--primary); color: #fff; }
+.btn-secondary { border: 1px solid #ddd; background: #f2f2f2; color: #333; }
+
+/* レスポンシブ微調整 */
+@media (max-width: 400px) {
+  .scale-head.global, .row--grid { grid-template-columns: 60px 1fr 60px; }
+  .btn-scale { gap: 6px; }
+  .head-left, .head-right { font-size: 11px; }
+}
+@media (min-width: 900px) {
+  .page { padding-bottom: 96px; }
+  .stimulus { max-height: 60vh; }
+  .btn-scale { gap: 12px; }
+}
