@@ -139,6 +139,7 @@ body {
 .btn-secondary:hover{ background:#d1d5db; }
 .btn-ghost{ background:none; color:#2563eb; font-size:13px; }
 
+
 /* ===== スマホ最適化 ===== */
 @media (max-width: 480px) {
   :root {
