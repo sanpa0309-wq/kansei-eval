@@ -65,8 +65,8 @@ body {
   grid-template-rows: auto auto;
   align-items: center;
 
-  /* ラベル↔○は重なりOKにするため間隔ゼロ */
-  row-gap: 0;
+  /* ← ラベルと○の距離を確保（重ならない） */
+  row-gap: 4px;
 
   /* 各評価行どうしは間隔をとる */
   margin: 18px 0;
@@ -75,7 +75,7 @@ body {
 }
 .row--grid:last-of-type { border-bottom: none; }
 
-/* 1段目：左右ラベル（端揃え・1行固定・若干小さめ） */
+/* 1段目：左右ラベル（端揃え・1行固定） */
 .label-left {
   grid-column: 1; grid-row: 1;
   justify-self: start;     /* 左端揃え */
@@ -83,8 +83,8 @@ body {
   padding-left: 4px;
   font-size: 14px;
   line-height: 1.1;
-  white-space: nowrap;     /* ← 折り返ししない */
-  overflow: visible;       /* ← ○と重なってOK */
+  white-space: nowrap;     /* 折り返ししない */
+  overflow: visible;
 }
 .label-right {
   grid-column: 3; grid-row: 1;
@@ -93,8 +93,8 @@ body {
   padding-right: 4px;
   font-size: 14px;
   line-height: 1.1;
-  white-space: nowrap;     /* ← 折り返ししない */
-  overflow: visible;       /* ← ○と重なってOK */
+  white-space: nowrap;     /* 折り返ししない */
+  overflow: visible;
 }
 
 /* 2段目：○（中央列固定幅・7等分で完全固定） */
@@ -109,9 +109,6 @@ body {
   grid-template-columns: repeat(7, var(--pill));
   column-gap: var(--gap);
   justify-content: center;
-
-  /* ラベルに少し潜り込ませる：重なり演出（調整可） */
-  margin-top: -6px;
 }
 
 /* 丸ボタン（0〜6） */
@@ -124,7 +121,7 @@ body {
   transition: background-color .15s, border-color .15s, color .15s;
 }
 .btn-scale .pill:hover { background: #f0f0f0; }
-.btn-scale .pill.pill--active { background: #2563eb; border-color:#2563eb; color:#fff; }
+.btn-scale .pill.pill--active { background:#2563eb; border-color:#2563eb; color:#fff; }
 
 /* ===== セグメントボタン（性別・年齢・グループ）===== */
 .seg-row { display:flex; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px; }
@@ -169,9 +166,6 @@ body {
   .label-left, .label-right { font-size: 13px; }
   .stimulus { border-radius: 6px; }
   .seg-label { min-width: 52px; }
-
-  /* モバイルは重なり量を少し増やして密に */
-  .btn-scale { margin-top: -8px; }
 }
 
 @media (max-width: 360px) {
