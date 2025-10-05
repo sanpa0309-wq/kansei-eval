@@ -1,138 +1,201 @@
-:root {
-  --radius: 12px;
-  --gap: 12px;
-  --fg: #111;
-  --muted: #555;
-  --line: #eaeaea;
-  --bg: #ffffff;
-  --primary: #2563eb;
-}
-
-html, body, #root { height: 100%; }
+/* ===== 全体構成 ===== */
 body {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
-  color: var(--fg); background: var(--bg); margin: 0;
-  -webkit-tap-highlight-color: transparent;
+  margin: 0;
+  font-family: "Noto Sans JP", sans-serif;
+  background: #f4f6f9;
+  color: #222;
+  -webkit-text-size-adjust: 100%;
 }
 
-/* レイアウト */
 .page {
-  max-width: 960px; margin: 0 auto;
-  padding: 12px clamp(12px, 4vw, 20px) calc(72px + env(safe-area-inset-bottom));
-  box-sizing: border-box;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 12px;
 }
-.topbar { margin: 16px 0 12px; }
-.title { font-size: clamp(18px, 5vw, 22px); margin: 0 0 6px; }
-.subtitle { font-size: 14px; margin: 0; color: var(--muted); }
 
-/* カード */
+/* ===== 見出し・ヘッダ ===== */
+.topbar {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+.title {
+  font-size: 20px;
+  margin: 0;
+}
+.subtitle {
+  font-size: 13px;
+  color: #666;
+  margin: 4px 0 0;
+}
+
+/* ===== カード風ブロック ===== */
 .card {
-  border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 14px; margin-bottom: 14px; background: #fafafa;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 .card-head {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 8px; gap: 8px; font-size: 14px;
-}
-
-/* 画像 */
-.img-wrap { display: grid; place-items: center; min-height: 120px; overflow: hidden; }
-.stimulus {
-  height: auto; max-width: min(96vw, 900px); max-height: 55vh;
-  object-fit: contain; display: block; border-radius: 8px;
-}
-
-/* ガイド（0 と 6 の真上） */
-.scale-head.global {
-  display: grid;
-  grid-template-columns: 80px 1fr 80px;
-  align-items: center; gap: 8px;
-  margin: 4px 0 8px;
-}
-.head-grid {
-  grid-column: 2;
-  display: grid; grid-template-columns: repeat(7, 1fr);
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 8px;
+  font-weight: 600;
 }
-.head-left  { grid-column: 1; text-align: center; font-size: 12px; color: #666; white-space: nowrap; }
-.head-right { grid-column: 7; text-align: center; font-size: 12px; color: #666; white-space: nowrap; }
 
-/* 評価スケール：左語 / 7等分ボタン / 右語 */
+/* ===== 画像表示 ===== */
+.img-wrap {
+  width: 100%;
+  text-align: center;
+}
+.stimulus {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+/* ===== 感性評価スケール ===== */
+.scale-head.global {
+  margin-bottom: 8px;
+}
+.scale-head.global .head-grid {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.scale-head.global .head-grid span {
+  writing-mode: vertical-rl;      /* 縦書き */
+  text-orientation: upright;
+  font-size: 13px;
+  line-height: 1.2;
+  color: #555;
+}
+
+/* 評価行 */
 .row--grid {
-  display: grid;
-  grid-template-columns: 80px 1fr 80px;
-  align-items: center; gap: 8px; margin: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0;
+  gap: 6px;
 }
-.label-left, .label-right { font-size: 15px; text-align: center; white-space: nowrap; }
 
-/* 7等分（評価ボタン用） */
+.label-left,
+.label-right {
+  flex: 1;
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .btn-scale {
-  display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: 8px; align-items: center;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex: 2;
 }
 
-/* === ボタン共通 === */
+/* スケールボタン（0〜6） */
 .pill {
-  /* ※ width:100% を外し、セグメントには自動幅、評価ボタンには下で個別指定 */
-  min-height: 44px;
-  border-radius: 999px;
-  border: 1px solid #dcdcdc;
-  background-color: #ffffff;
-  color: #333;
-  font-size: 16px;
-  padding: 6px 12px;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 14px;
+  text-align: center;
+  line-height: 34px;
   cursor: pointer;
-  touch-action: manipulation;
-  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
-  opacity: 1;
+  transition: all 0.15s;
+}
+.pill:hover {
+  background: #f0f0f0;
 }
 .pill--active {
-  background-color: var(--primary) !important;
-  color: #fff !important;
-  border-color: var(--primary);
-  opacity: 1 !important;
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
 }
-.pill:active { filter: brightness(0.95); }
-.pill:focus-visible { outline: 2px solid #94b6ff; outline-offset: 2px; }
 
-/* 評価ボタンだけはセル幅いっぱいに（7等分を等間隔に見せる） */
-.btn-scale .pill { width: 100%; padding-left: 0; padding-right: 0; }
-
-/* ===== セグメント（性別・年齢）を横並びに ===== */
-.seg-row { margin: 10px 0; }
-.seg-label { font-size: 14px; margin-bottom: 6px; }
+/* ===== 性別・年齢などの横並びボタン ===== */
+.seg-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.seg-label {
+  font-weight: 500;
+  min-width: 60px;
+}
 .seg-wrap {
-  display: flex; flex-wrap: wrap; gap: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .seg-pill {
-  /* セグメントは自然な横並びにするため幅は自動 */
-  width: auto;
-  padding: 8px 14px;
+  border-radius: 20px;
+  padding: 6px 14px;
 }
 
-/* 送信バー（固定） */
+/* ===== フッターのボタン ===== */
 .submit-bar {
-  position: fixed; left: 0; right: 0; bottom: 0;
-  padding: 10px calc(14px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
-  background: rgba(255,255,255,0.95); backdrop-filter: blur(6px);
-  border-top: 1px solid var(--line);
-  display: flex; gap: 10px; justify-content: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
 }
-.btn-primary, .btn-secondary {
-  min-height: 44px; padding: 10px 16px; border-radius: 12px;
-  font-size: 16px; cursor: pointer; touch-action: manipulation;
+.btn-primary,
+.btn-secondary,
+.btn-ghost {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
 }
-.btn-primary { border: none; background: var(--primary); color: #fff; }
-.btn-secondary { border: 1px solid #ddd; background: #f2f2f2; color: #333; }
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+.btn-secondary {
+  background: #e5e7eb;
+}
+.btn-secondary:hover {
+  background: #d1d5db;
+}
+.btn-ghost {
+  background: none;
+  color: #2563eb;
+  font-size: 13px;
+}
 
-/* レスポンシブ微調整 */
-@media (max-width: 400px) {
-  .scale-head.global, .row--grid { grid-template-columns: 60px 1fr 60px; }
-  .btn-scale { gap: 6px; }
-  .head-left, .head-right { font-size: 11px; }
-}
-@media (min-width: 900px) {
-  .page { padding-bottom: 96px; }
-  .stimulus { max-height: 60vh; }
-  .btn-scale { gap: 12px; }
+/* ===== スマホ対応 ===== */
+@media (max-width: 480px) {
+  .pill {
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    font-size: 13px;
+  }
+  .label-left,
+  .label-right {
+    font-size: 13px;
+  }
+  .stimulus {
+    border-radius: 6px;
+  }
+  .seg-label {
+    min-width: 52px;
+  }
 }
