@@ -181,7 +181,6 @@ body {
   }
 }
 
-
 /* もっと狭い端末の最終保険（320px以下） */
 @media (max-width: 320px) {
   :root {
