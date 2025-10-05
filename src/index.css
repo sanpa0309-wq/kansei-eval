@@ -1,4 +1,11 @@
-/* ===== 全体構成 ===== */
+/* ===== 変数：丸ボタンの直径/間隔 ===== */
+:root {
+  --pill: 34px;   /* 数値スケール(0-6)の丸ボタン直径 */
+  --gap: 8px;     /* 丸ボタン間隔 */
+  --scale-width: calc(var(--pill)*7 + var(--gap)*6); /* 0〜6列の総幅 */
+}
+
+/* ===== ベース ===== */
 body {
   margin: 0;
   font-family: "Noto Sans JP", sans-serif;
@@ -6,196 +13,128 @@ body {
   color: #222;
   -webkit-text-size-adjust: 100%;
 }
+.page { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-.page {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 12px;
-}
+/* ===== ヘッダ ===== */
+.topbar { text-align: center; padding: 8px 0 4px; }
+.title { font-size: 20px; margin: 0; }
+.subtitle { font-size: 13px; color: #666; margin: 4px 0 0; }
 
-/* ===== 見出し・ヘッダ ===== */
-.topbar {
-  text-align: center;
-  padding: 8px 0 4px;
-}
-.title {
-  font-size: 20px;
-  margin: 0;
-}
-.subtitle {
-  font-size: 13px;
-  color: #666;
-  margin: 4px 0 0;
-}
-
-/* ===== カード風ブロック ===== */
+/* ===== カード ===== */
 .card {
   background: #fff;
   border-radius: 12px;
   padding: 16px;
   margin-top: 10px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 .card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-weight: 600;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px; font-weight: 600;
 }
 
-/* ===== 画像表示 ===== */
-.img-wrap {
-  width: 100%;
-  text-align: center;
-}
-.stimulus {
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-  margin-top: 8px;
-}
+/* ===== 画像 ===== */
+.img-wrap { width: 100%; text-align: center; }
+.stimulus { max-width: 100%; height: auto; border-radius: 8px; margin-top: 8px; }
 
-/* ===== 感性評価スケール ===== */
-.scale-head.global {
-  margin-bottom: 8px;
-}
+/* ===== 「非常にそう思う」ヘッダ（0と6の真上） ===== */
+.scale-head.global { margin-bottom: 8px; }
 .scale-head.global .head-grid {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
+  width: var(--scale-width);
+  margin: 0 auto;
+  position: relative;
+  height: 72px;
 }
-.scale-head.global .head-grid span {
-  writing-mode: vertical-rl;      /* 縦書き */
-  text-orientation: upright;
-  font-size: 13px;
-  line-height: 1.2;
-  color: #555;
+.scale-head.global .head-left,
+.scale-head.global .head-right {
+  position: absolute; top: 0;
+  writing-mode: vertical-rl; text-orientation: upright;
+  font-size: 13px; line-height: 1.2; color: #555;
 }
+.scale-head.global .head-left  { left: 0; }
+.scale-head.global .head-right { right: 0; }
 
-/* 評価行 */
+/* ===== スケール行（左右ラベル＋丸ボタン列）===== */
 .row--grid {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 12px 0;
-  gap: 6px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 12px 0; gap: 6px;
+}
+.label-left, .label-right {
+  flex: 1; font-size: 14px; text-align: center; white-space: nowrap;
 }
 
-.label-left,
-.label-right {
-  flex: 1;
-  font-size: 14px;
-  text-align: center;
-  white-space: nowrap;
-}
-
+/* 丸ボタンの行（中央の0〜6） */
 .btn-scale {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
   flex: 2;
+  width: var(--scale-width);
+  margin: 0 auto;
+  display: flex; justify-content: center; gap: var(--gap);
 }
 
-/* スケールボタン（0〜6） */
-.pill {
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  font-size: 14px;
-  text-align: center;
-  line-height: 34px;
-  cursor: pointer;
-  transition: all 0.15s;
+/* ★ 丸ボタンのサイズ指定は btn-scale 内だけに限定 */
+.btn-scale .pill {
+  border: 1px solid #ccc; background: #fff; border-radius: 50%;
+  width: var(--pill); height: var(--pill);
+  font-size: 14px; text-align: center; line-height: var(--pill);
+  cursor: pointer; transition: all .15s;
 }
-.pill:hover {
-  background: #f0f0f0;
-}
-.pill--active {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #fff;
+.btn-scale .pill:hover { background: #f0f0f0; }
+.btn-scale .pill.pill--active { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+/* ===== セグメントボタン（性別・年齢・グループ）===== */
+.seg-row { display: flex; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+.seg-label { font-weight: 500; min-width: 60px; }
+
+/* “縦書きの影響を受けない”のを保証 */
+.seg-row, .seg-label, .seg-wrap, .seg-pill, .seg-pill * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
 }
 
-/* ===== 性別・年齢などの横並びボタン ===== */
-.seg-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.seg-label {
-  font-weight: 500;
-  min-width: 60px;
-}
-.seg-wrap {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
+.seg-wrap { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ★ ここで丸ボタンの影響を完全に打ち消す（横長チップに） */
 .seg-pill {
-  border-radius: 20px;
-  padding: 6px 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
+  min-height: 36px;                  /* 高さを確保 */
+  padding: 6px 14px;                 /* 横長 */
+  border: 1px solid #ddd; background: #fff; border-radius: 9999px;
+  font-size: 14px; line-height: 1.2; white-space: nowrap;
+  width: auto !important; height: auto !important; /* 丸ボタンの固定サイズを無効化 */
+}
+.seg-pill.pill--active {
+  background: #2563eb; border-color: #2563eb; color: #fff;
 }
 
-/* ===== フッターのボタン ===== */
+/* ===== フッターボタン ===== */
 .submit-bar {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 16px;
+  display: flex; justify-content: space-between; gap: 10px; margin-top: 16px;
 }
-.btn-primary,
-.btn-secondary,
-.btn-ghost {
-  flex: 1;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: all 0.15s;
+.btn-primary, .btn-secondary, .btn-ghost {
+  flex: 1; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 600;
+  cursor: pointer; border: none; transition: all .15s;
 }
-.btn-primary {
-  background: #2563eb;
-  color: #fff;
-}
-.btn-primary:hover {
-  background: #1d4ed8;
-}
-.btn-secondary {
-  background: #e5e7eb;
-}
-.btn-secondary:hover {
-  background: #d1d5db;
-}
-.btn-ghost {
-  background: none;
-  color: #2563eb;
-  font-size: 13px;
-}
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: #e5e7eb; }
+.btn-secondary:hover { background: #d1d5db; }
+.btn-ghost { background: none; color: #2563eb; font-size: 13px; }
 
-/* ===== スマホ対応 ===== */
+/* ===== スマホ最適化 ===== */
 @media (max-width: 480px) {
-  .pill {
-    width: 30px;
-    height: 30px;
-    line-height: 30px;
-    font-size: 13px;
+  :root {
+    --pill: 30px;  /* スマホは丸ボタンを少し小さく */
+    --gap: 8px;
+    --scale-width: calc(var(--pill)*7 + var(--gap)*6);
   }
-  .label-left,
-  .label-right {
-    font-size: 13px;
-  }
-  .stimulus {
-    border-radius: 6px;
-  }
-  .seg-label {
-    min-width: 52px;
-  }
+  .label-left, .label-right { font-size: 13px; }
+  .stimulus { border-radius: 6px; }
+  .seg-label { min-width: 52px; }
+
+  /* ヘッダ縦書きの高さを微調整 */
+  .scale-head.global .head-grid { height: 66px; }
+
+  /* ボタン文言が長い場合に折り返しを許可（必要ならON） */
+  /* .seg-pill { white-space: normal; padding: 8px 12px; } */
 }
