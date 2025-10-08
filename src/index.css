@@ -2,9 +2,10 @@
 * { box-sizing: border-box; }
 
 :root {
-  --pill: 34px;                /* 丸ボタン直径 */
-  --gap: 8px;                  /* ボタン間隔 */
-  --scale-width: calc(var(--pill) * 7 + var(--gap) * 6); /* ○列の厳密幅 */
+  /* 5段階スケール用：○直径/間隔/総幅（固定） */
+  --pill: 34px;                    /* 丸ボタン直径 */
+  --gap: 8px;                      /* 丸ボタン間隔（列間） */
+  --scale-width: calc(var(--pill) * 5 + var(--gap) * 4); /* 5列の総幅を厳密固定 */
 }
 
 html, body { margin: 0; padding: 0; }
@@ -36,97 +37,106 @@ body {
 .img-wrap { width:100%; text-align:center; }
 .stimulus { max-width:100%; height:auto; border-radius:8px; margin-top:8px; }
 
-/* ===== 「非常にそう思う」（0と6の真上・縦書き） ===== */
-.scale-head.global { margin-bottom: 8px; }
-.scale-head.global .head-grid {
+/* ===== 5段階ガイド（縦書き・1〜5すべて表示） ===== */
+.scale-head.global.five { margin-bottom: 8px; }
+.head-grid-5 {
   width: var(--scale-width);
-  margin: 0 auto;
-  position: relative;
-  height: 72px;
   min-width: var(--scale-width);
   max-width: var(--scale-width);
+  margin: 0 auto;
+  position: relative;
+  height: 48px; /* 縦書きで高さを確保 */
 }
-.scale-head.global .head-left,
-.scale-head.global .head-right {
-  position: absolute; top: 0;
-  writing-mode: vertical-rl; text-orientation: upright;
-  font-size: 13px; line-height: 1.2; color: #555;
-}
-.scale-head.global .head-left  { left: 0; }
-.scale-head.global .head-right { right: 0; }
 
-/* ===== スケール行：1段目=左右ラベル（端揃え）／2段目=○（固定） ===== */
+/* ガイドテキストは縦書き */
+.head-grid-5 span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.1;
+  color: #555;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+
+/* 列位置（1〜5列の中心） */
+.head-grid-5 .head-1 { left: calc((var(--pill) + var(--gap)) * 0 + var(--pill) / 2); }
+.head-grid-5 .head-2 { left: calc((var(--pill) + var(--gap)) * 1 + var(--pill) / 2); }
+.head-grid-5 .head-3 { left: calc((var(--pill) + var(--gap)) * 2 + var(--pill) / 2); }
+.head-grid-5 .head-4 { left: calc((var(--pill) + var(--gap)) * 3 + var(--pill) / 2); }
+.head-grid-5 .head-5 { left: calc((var(--pill) + var(--gap)) * 4 + var(--pill) / 2); }
+
+@media (max-width: 480px) {
+  .head-grid-5 { height: 40px; }
+  .head-grid-5 span { font-size: 11px; }
+}
+
+/* ===== スケール行：1段目=左右ラベル／2段目=○ ===== */
 .row--grid {
   display: grid;
   grid-template-columns:
     minmax(0, 1fr)
     minmax(var(--scale-width), var(--scale-width))
     minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto;       /* 1段目=ラベル / 2段目=○ */
   align-items: center;
-
-  /* ← ラベルと○の距離を確保（重ならない） */
-  row-gap: 4px;
-
-  /* 各評価行どうしは間隔をとる */
+  row-gap: 4px;                        /* 重ならない距離で近め */
   margin: 18px 0;
-  border-bottom: 1px dashed #ccc;
+  border-bottom: 1px dashed #ccc;      /* 薄い点線の区切り */
   padding-bottom: 14px;
 }
 .row--grid:last-of-type { border-bottom: none; }
 
-/* 1段目：左右ラベル（端揃え・1行固定） */
+/* 感性語ラベル：+1px（15px）・左右端揃え */
 .label-left {
   grid-column: 1; grid-row: 1;
-  justify-self: start;     /* 左端揃え */
-  text-align: left;
+  justify-self: start; text-align: left;
   padding-left: 4px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.1;
-  white-space: nowrap;     /* 折り返ししない */
+  white-space: nowrap;
   overflow: visible;
 }
 .label-right {
   grid-column: 3; grid-row: 1;
-  justify-self: end;       /* 右端揃え */
-  text-align: right;
+  justify-self: end; text-align: right;
   padding-right: 4px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.1;
-  white-space: nowrap;     /* 折り返ししない */
+  white-space: nowrap;
   overflow: visible;
 }
 
-/* 2段目：○（中央列固定幅・7等分で完全固定） */
+/* ○の列：5等分グリッドで位置を完全固定（数字は非表示） */
 .btn-scale {
   grid-column: 2; grid-row: 2;
   width: var(--scale-width);
   min-width: var(--scale-width);
   max-width: var(--scale-width);
   margin: 0 auto;
-
   display: grid;
-  grid-template-columns: repeat(7, var(--pill));
+  grid-template-columns: repeat(5, var(--pill));
   column-gap: var(--gap);
   justify-content: center;
 }
-
-/* 丸ボタン（0〜6） */
 .btn-scale .pill {
   display: inline-block;
   border: 1px solid #ccc; background: #fff; border-radius: 50%;
   width: var(--pill); height: var(--pill);
-  font-size: 14px; text-align: center; line-height: var(--pill);
+  font-size: 0; /* 数字は非表示（内部記録のみ） */
+  line-height: var(--pill);
   cursor: pointer; user-select: none;
-  transition: background-color .15s, border-color .15s, color .15s;
+  transition: background-color .15s, border-color .15s;
 }
 .btn-scale .pill:hover { background: #f0f0f0; }
 .btn-scale .pill.pill--active { background:#2563eb; border-color:#2563eb; color:#fff; }
 
-/* ===== セグメントボタン（性別・年齢・グループ）===== */
+/* ===== セグメント（性別・年齢・グループ）===== */
 .seg-row { display:flex; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px; }
 .seg-label { font-weight:500; min-width:60px; }
-/* 縦書きの影響を遮断：必ず横書き */
+/* 縦書き影響を遮断：必ず横書き */
 .seg-row, .seg-label, .seg-wrap, .seg-pill, .seg-pill * {
   writing-mode: horizontal-tb !important;
   text-orientation: mixed !important;
@@ -155,30 +165,34 @@ body {
 .btn-secondary:hover{ background:#d1d5db; }
 .btn-ghost{ background:none; color:#2563eb; font-size:13px; }
 
-/* ===== モバイル最適化（段階的に○を小さく） ===== */
+/* ===== モバイル最適化 ===== */
 @media (max-width: 480px) {
   :root {
     --pill: 28px;
     --gap: 6px;
-    --scale-width: calc(var(--pill) * 7 + var(--gap) * 6);
+    --scale-width: calc(var(--pill) * 5 + var(--gap) * 4);
   }
-  .scale-head.global .head-grid { height: 66px; }
-  .label-left, .label-right { font-size: 13px; }
-  .stimulus { border-radius: 6px; }
+  .label-left, .label-right { font-size: 14px; }
+  .head-grid-5 { height: 40px; }
+  .head-grid-5 span { font-size: 11px; }
   .seg-label { min-width: 52px; }
+  .stimulus { border-radius: 6px; }
 }
 
 @media (max-width: 360px) {
   :root {
     --pill: 26px;
     --gap: 6px;
-    --scale-width: calc(var(--pill) * 7 + var(--gap) * 6);
+    --scale-width: calc(var(--pill) * 5 + var(--gap) * 4);
   }
+  .head-grid-5 { height: 36px; }
 }
+
 @media (max-width: 320px) {
   :root {
     --pill: 24px;
     --gap: 6px;
-    --scale-width: calc(var(--pill) * 7 + var(--gap) * 6);
+    --scale-width: calc(var(--pill) * 5 + var(--gap) * 4);
   }
+  .head-grid-5 { height: 32px; }
 }
