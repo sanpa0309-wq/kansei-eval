@@ -512,10 +512,13 @@ function ResultsPage() {
               const id = rec.image_id ?? null;
               const path = rec.image ?? null;
               const name = (path || `id-${id}` || `#${i}`).split("/").pop()?.replace(/\.[^.]+$/,"");
-              const href = id != null
-                ? `/image?g=${g}&image_id=${encodeURIComponent(id)}`
-                : `/image?g=${g}&image=${encodeURIComponent(path || "")}`;
-              const imgSrc = path || ""; // サムネは path があるときのみ表示
+
+                // 常に image_id へリンク（idが無いレコードはスキップ）
+              if (id == null) return null;
+
+              const href = `/image?g=${g}&image_id=${encodeURIComponent(id)}`;
+              const imgSrc = path || ""; // サムネールは path がある場合だけ出す
+
               return (
                 <a className="card-thumb" href={href} key={`${id ?? path ?? i}`}>
                   <div className={`thumb ${imgSrc.includes("/g") ? "" : ""}`}>
@@ -537,28 +540,41 @@ function ImagePage() {
   const params = new URLSearchParams(location.search);
   const g = parseInt(params.get("g") || "0", 10);
   const image_id = params.get("image_id");
-  const image = params.get("image");
+  
 
   const [dist, setDist] = useState(null); // { counts: {pair: {'1':n..'5':n}} }
   const [meta, setMeta] = useState({ path: null });
 
   useEffect(() => {
-    const run = async () => {
-      const url = new URL(`${API_BASE}/summary`);
+  const run = async () => {
+    try {
+      // 相対URLを new URL で使うときは base を渡す（location.origin）
+      const url = new URL(`${API_BASE}/summary`, location.origin);
       url.searchParams.set("mode", "image");
       url.searchParams.set("g", String(g));
-      if (image_id) url.searchParams.set("image_id", String(image_id));
-      else if (image) url.searchParams.set("image", String(image));
+      if (!image_id) throw new Error("image_id is required");
+      url.searchParams.set("image_id", String(image_id));
+
       const r = await fetch(url.toString(), { method: "GET" });
       const json = await r.json();
+
+      // 本文（分布）
       setDist(json || null);
 
-      // パスの判定（GAS側の出力構造に合わせて推測）
-      const p = json?.image || json?.image_path || image || null;
+      // 画像パス（レスポンスにあれば表示、無ければ非表示でOK）
+      const p = json?.image || json?.image_path || null;
       setMeta({ path: p });
-    };
-    if (g >= 1 && g <= 5 && (image_id || image)) run();
-  }, [g, image_id, image]);
+    } catch (e) {
+      console.error(e);
+      // エラーでも状態更新して「読み込み中…」から必ず抜ける
+      setDist(null);
+      setMeta({ path: null });
+    }
+  };
+
+  if (g >= 1 && g <= 5 && image_id) run();
+}, [g, image_id]);
+
 
   // 簡易レンダラー（SVG棒グラフ／件数は描かない）
   const PAIRS = [
