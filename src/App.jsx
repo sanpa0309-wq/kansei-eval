@@ -1,77 +1,119 @@
-// /src/App.jsx
 import { useEffect, useMemo, useState } from "react";
 
-/** ==== 画像メタ（id / path / aspect）====
- * aspect: "2x3" (266x400等の縦長) | "1x1" (400x400等)
- * 画像ファイルは public/ 以下に置く
- */
+/** ===== 画像セット（public/groups/g1..g5/ 配下） ===== */
 const GROUP_IMAGES = {
   1: [
-    { id: 101, path: "/groups/g1/Consciousness-1.png", aspect: "2x3" },
-    { id: 102, path: "/groups/g1/Conversations-3.png", aspect: "2x3" },
-    { id: 103, path: "/groups/g1/Identity-2.png", aspect: "2x3" },
-    { id: 104, path: "/groups/g1/Integrity-1.png", aspect: "2x3" },
-    { id: 105, path: "/groups/g1/Materiality-3.png", aspect: "2x3" },
-    { id: 106, path: "/groups/g1/Relationship-2.png", aspect: "2x3" },
+    "/groups/g1/Consciousness-1.png",
+    "/groups/g1/Conversations-3.png",
+    "/groups/g1/Identity-2.png",
+    "/groups/g1/Integrity-1.png",
+    "/groups/g1/Materiality-3.png",
+    "/groups/g1/Relationship-2.png",
   ],
   2: [
-    { id: 201, path: "/groups/g2/Consciousness-2.png", aspect: "2x3" },
-    { id: 202, path: "/groups/g2/Evolvability-1.png", aspect: "2x3" },
-    { id: 203, path: "/groups/g2/Identity-3.png", aspect: "2x3" },
-    { id: 204, path: "/groups/g2/Integrity-2.png", aspect: "2x3" },
-    { id: 205, path: "/groups/g2/Narratives-1.png", aspect: "2x3" },
-    { id: 206, path: "/groups/g2/Relationship-3.png", aspect: "2x3" },
+    "/groups/g2/Consciousness-2.png",
+    "/groups/g2/Evolvability-1.png",
+    "/groups/g2/Identity-3.png",
+    "/groups/g2/Integrity-2.png",
+    "/groups/g2/Narratives-1.png",
+    "/groups/g2/Relationship-3.png",
   ],
   3: [
-    { id: 301, path: "/groups/g3/Consciousness-3.png", aspect: "2x3" },
-    { id: 302, path: "/groups/g3/Evolvability-2.png", aspect: "2x3" },
-    { id: 303, path: "/groups/g3/Imagination-1.png", aspect: "2x3" },
-    { id: 304, path: "/groups/g3/Integrity-3.png", aspect: "2x3" },
-    { id: 305, path: "/groups/g3/Narratives-2.png", aspect: "2x3" },
-    { id: 306, path: "/groups/g3/比較用タンブラー画像1.png", aspect: "1x1" },
+    "/groups/g3/Consciousness-3.png",
+    "/groups/g3/Evolvability-2.png",
+    "/groups/g3/Imagination-1.png",
+    "/groups/g3/Integrity-3.png",
+    "/groups/g3/Narratives-2.png",
+    "/groups/g3/比較用タンブラー画像1.png",
   ],
   4: [
-    { id: 401, path: "/groups/g4/Conversations-1.png", aspect: "2x3" },
-    { id: 402, path: "/groups/g4/Evolvability-3.png", aspect: "2x3" },
-    { id: 403, path: "/groups/g4/Imagination-2.png", aspect: "2x3" },
-    { id: 404, path: "/groups/g4/Materiality-1.png", aspect: "2x3" },
-    { id: 405, path: "/groups/g4/Narratives-3.png", aspect: "2x3" },
-    { id: 406, path: "/groups/g4/比較用タンブラー画像2.png", aspect: "1x1" },
+    "/groups/g4/Conversations-1.png",
+    "/groups/g4/Evolvability-3.png",
+    "/groups/g4/Imagination-2.png",
+    "/groups/g4/Materiality-1.png",
+    "/groups/g4/Narratives-3.png",
+    "/groups/g4/比較用タンブラー画像2.png",
   ],
   5: [
-    { id: 501, path: "/groups/g5/Conversations-2.png", aspect: "2x3" },
-    { id: 502, path: "/groups/g5/Identity-1.png", aspect: "2x3" },
-    { id: 503, path: "/groups/g5/Imagination-3.png", aspect: "2x3" },
-    { id: 504, path: "/groups/g5/Materiality-2.png", aspect: "2x3" },
-    { id: 505, path: "/groups/g5/Relationship-1.png", aspect: "2x3" },
-    { id: 506, path: "/groups/g5/比較用タンブラー画像3.png", aspect: "1x1" },
+    "/groups/g5/Conversations-2.png",
+    "/groups/g5/Identity-1.png",
+    "/groups/g5/Imagination-3.png",
+    "/groups/g5/Materiality-2.png",
+    "/groups/g5/Relationship-1.png",
+    "/groups/g5/比較用タンブラー画像3.png",
   ],
 };
 
-/** 5段階（1〜5）行 */
+/** ===== API 基底（本番は /api、ローカルは .env.local でVITE_API_BASEを指定可） ===== */
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+
+/** ===== Cookie helpers（安全版）===== */
+function getCookie(name) {
+  if (typeof document === "undefined") return null;
+  const arr = document.cookie ? document.cookie.split(";") : [];
+  for (const raw of arr) {
+    const [k, ...rest] = raw.trim().split("=");
+    if (decodeURIComponent(k) === name) {
+      return decodeURIComponent(rest.join("="));
+    }
+  }
+  return null;
+}
+function setCookie(name, value, days = 365) {
+  if (typeof document === "undefined") return;
+  const d = new Date();
+  d.setTime(d.getTime() + days * 864e5);
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
+    value
+  )}; path=/; expires=${d.toUTCString()}`;
+}
+
+/** ===== ユーティリティ ===== */
+const uid = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+const shuffle = (arr) => {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// 数値化マップ（送信を軽く）
+const GENDER_CODE = { male: 1, female: 2, na: 0 };
+const AGE_CODE = {
+  "0-9": 1, "10-19": 2, "20-29": 3, "30-39": 4, "40-49": 5,
+  "50-59": 6, "60-69": 7, "70-": 8, "": 0
+};
+
+/** ===== 5段階スケール行（丸ボタン、数値は表示しない）===== */
 function ScaleRow({ pair, value, onChange }) {
   const nums = [1, 2, 3, 4, 5];
   return (
     <div className="row row--grid">
       <span className="label-left">{pair.left}</span>
       <span className="label-right">{pair.right}</span>
+
       <div className="btn-scale" aria-label={`${pair.left} から ${pair.right} の5段階評価`}>
-        {nums.map((n) => (
-          <button
-            key={n}
-            type="button"
-            aria-pressed={value === n}
-            aria-label={`${n}`}
-            onClick={() => onChange(n)}
-            className={`pill ${value === n ? "pill--active" : ""}`}
-          />
-        ))}
+        {nums.map((n) => {
+          const selected = value === n;
+          return (
+            <button
+              key={n}
+              type="button"
+              aria-pressed={selected}
+              aria-label={`${n}`}
+              onClick={() => onChange(n)}
+              className={`pill ${selected ? "pill--active" : ""}`}
+            />
+          );
+        })}
       </div>
     </div>
   );
 }
 
-/** セグメント（性別・年齢・グループ） */
+/** ===== セグメントボタン（性別・年齢・グループ） ===== */
 function Segmented({ label, options, value, onChange }) {
   return (
     <div className="seg-row">
@@ -96,83 +138,13 @@ function Segmented({ label, options, value, onChange }) {
   );
 }
 
-/** 乱数（安定シャッフル用・シード付き） */
-function mulberry32(seed) {
-  return function () {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function hashStringToSeed(s) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-function shuffleStable(arr, seedStr) {
-  const rng = mulberry32(hashStringToSeed(seedStr));
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// Cookie helpers（安全版）
-function getCookie(name) {
-  if (typeof document === "undefined") return null;
-  const arr = document.cookie ? document.cookie.split(";") : [];
-  for (const raw of arr) {
-    const [k, ...rest] = raw.trim().split("=");
-    if (decodeURIComponent(k) === name) {
-      return decodeURIComponent(rest.join("="));
-    }
-  }
-  return null;
-}
-
-function setCookie(name, value, days = 365) {
-  if (typeof document === "undefined") return;
-  const d = new Date();
-  d.setTime(d.getTime() + days * 864e5);
-  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
-    value
-  )}; path=/; expires=${d.toUTCString()}`;
-}
-
-/** API base */
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
-
-/** ===== ルーター：location.pathname で分岐 ===== */
-export default function App() {
-  const path = location.pathname;
-  if (path === "/results") return <ResultsPage />;
-  if (path === "/image") return <ImagePage />;
-  return <SurveyPage />;
-}
-
-/** ===== / （回答ページ） ===== */
+/** ====== ページ：アンケート本編 ====== */
 function SurveyPage() {
-  // participant_id（セッション固定／「最初から」で更新）
-  const [participantId, setParticipantId] = useState(null);
-  useEffect(() => {
-    const cur = sessionStorage.getItem("currentPid");
-    if (cur) setParticipantId(cur);
-    else {
-      const pid = crypto.randomUUID();
-      sessionStorage.setItem("currentPid", pid);
-      setParticipantId(pid);
-    }
-  }, []);
-
-  // グループ自動割当（ほぼ均等）— URL ?group= があれば優先
+  // 初期 group 決定（?group=…優先、それ以外は「ほぼ均等」ローテ）
   const [groupId, setGroupId] = useState(null);
   const [lockedByQuery, setLockedByQuery] = useState(false);
+  const [participantId, setParticipantId] = useState("anon");
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const qg = params.get("group");
@@ -180,15 +152,28 @@ function SurveyPage() {
     if (g && g >= 1 && g <= 5) {
       setGroupId(g);
       setLockedByQuery(true);
-      return;
+    } else {
+      // lastGroup を cookie で保持して「ほぼ均等」を実現（1→2→…→5→1…）
+      const last = parseInt(getCookie("lastGroup") || "0", 10);
+      const next = ((isNaN(last) ? 0 : last) % 5) + 1;
+      setGroupId(next);
+      setCookie("lastGroup", String(next));
     }
-    const last = parseInt(getCookie("lastGroup") || "0", 10);
-    const next = (last % 5) + 1;
-    setGroupId(next);
-    setCookie("lastGroup", String(next));
+    const pid = params.get("pid");
+    if (pid) setParticipantId(String(pid));
+    else {
+      // 既存 participant_id が無ければ採番
+      const saved = getCookie("participant_id");
+      if (saved) setParticipantId(saved);
+      else {
+        const p = "p_" + uid();
+        setParticipantId(p);
+        setCookie("participant_id", p);
+      }
+    }
   }, []);
 
-  // 感性語対
+  // 感性語ペア（文言調整：男性/女性・古典的/現代的）
   const pairs = useMemo(
     () => [
       { key: "modest_luxury", left: "控えめ", right: "豪華な" },
@@ -202,48 +187,49 @@ function SurveyPage() {
     []
   );
 
-  // 評価初期値
   const initialValues = useMemo(
-    () =>
-      pairs.reduce((acc, p) => {
-        acc[p.key] = null;
-        return acc;
-      }, {}),
+    () => pairs.reduce((acc, p) => ((acc[p.key] = null), acc), {}),
     [pairs]
   );
   const [values, setValues] = useState(initialValues);
-  const setVal = (key, v) => setValues((prev) => ({ ...prev, [key]: v }));
 
-  // 性別・年齢（数値化）
+  // 性別：ラベルを「男性・女性」に変更
   const genderOptions = [
-    { label: "男性", value: 1 },
-    { label: "女性", value: 2 },
-    { label: "無回答", value: 0 },
+    { label: "男性", value: "male" },
+    { label: "女性", value: "female" },
+    { label: "無回答", value: "na" },
   ];
   const ageOptions = [
-    { label: "0〜9歳", value: 1 },
-    { label: "10〜19歳", value: 2 },
-    { label: "20〜29歳", value: 3 },
-    { label: "30〜39歳", value: 4 },
-    { label: "40〜49歳", value: 5 },
-    { label: "50〜59歳", value: 6 },
-    { label: "60〜69歳", value: 7 },
-    { label: "70歳〜", value: 8 },
+    { label: "0〜9歳", value: "0-9" },
+    { label: "10〜19歳", value: "10-19" },
+    { label: "20〜29歳", value: "20-29" },
+    { label: "30〜39歳", value: "30-39" },
+    { label: "40〜49歳", value: "40-49" },
+    { label: "50〜59歳", value: "50-59" },
+    { label: "60〜69歳", value: "60-69" },
+    { label: "70歳〜", value: "70-" },
   ];
-  const [gender, setGender] = useState(0);
+  const [gender, setGender] = useState("na");
   const [ageBucket, setAgeBucket] = useState("");
 
-  // 画像配列→ 参加者ごとに安定シャッフル
-  const rawImages = useMemo(() => (groupId ? GROUP_IMAGES[groupId] || [] : []), [groupId]);
-  const images = useMemo(() => {
-    if (!participantId) return [];
-    return shuffleStable(rawImages, `${participantId}::g${groupId || 0}`);
-  }, [participantId, rawImages, groupId]);
+  // 画像群（ランダム順）
+  const [images, setImages] = useState([]);
+  useEffect(() => {
+    if (!groupId) return;
+    setImages(shuffle(GROUP_IMAGES[groupId] || []));
+  }, [groupId]);
 
   const [index, setIndex] = useState(0);
-  const [records, setRecords] = useState([]);
-  const current = images[index] || null;
+  const [records, setRecords] = useState([]); // 送信済みレコード
+  const currentImage = images[index] || null;
+  const setVal = (key, v) => setValues((prev) => ({ ...prev, [key]: v }));
 
+  const resetValuesForNext = () => {
+    setValues(initialValues);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 前のレコードから復元（戻る用）
   const restoreValuesFromRecord = (rec) => {
     if (!rec) return;
     setValues({
@@ -255,8 +241,8 @@ function SurveyPage() {
       soft_hard: rec.soft_hard ?? null,
       heavy_light: rec.heavy_light ?? null,
     });
-    if (typeof rec.gender === "number") setGender(rec.gender);
-    if (rec.age_bucket !== undefined) setAgeBucket(rec.age_bucket);
+    if (rec.gender_code != null) setGender(rec.gender_code === 2 ? "female" : rec.gender_code === 1 ? "male" : "na");
+    // age は見た目用の value を復元しない（初回だけ選択）
   };
 
   const allValuesSelected = useMemo(
@@ -264,54 +250,51 @@ function SurveyPage() {
     [pairs, values]
   );
 
-  // 送信
+  // === 送信：/api/submit（GAS 経由） ===
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const postOne = async (payload) => {
-    const res = await fetch(`${API_BASE}/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+
+  const postOne = async (row) => {
     try {
-      await res.json();
-    } catch {}
+      const r = await fetch(`${API_BASE}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(row),
+      });
+      await r.text(); // GASからのテキストJSON（無視可）
+    } catch (e) {
+      console.warn("submit failed (ignored):", e);
+    }
   };
 
-  // 自分の回答を sessionStorage にも残す（/image ページで参照）
-  const saveMyAnswerSnapshot = (row) => {
-    const pid = row.participant_id;
-    const g = row.group_id;
-    const id = row.image_id;
-    const key = `answer::${pid}::g${g}::img${id}`;
-    const payload = {
-      modest_luxury: row.modest_luxury,
-      colorful_monochrome: row.colorful_monochrome,
-      feminine_masculine: row.feminine_masculine,
-      complex_simple: row.complex_simple,
-      classic_modern: row.classic_modern,
-      soft_hard: row.soft_hard,
-      heavy_light: row.heavy_light,
-    };
-    sessionStorage.setItem(key, JSON.stringify(payload));
+  // 画像ID（GAS側で id 採番してる場合に備え、pathから簡易ハッシュ）
+  const imageIdFromPath = (p) => {
+    if (!p) return null;
+    let h = 0;
+    for (let i = 0; i < p.length; i++) {
+      h = (h * 31 + p.charCodeAt(i)) >>> 0;
+    }
+    // 100〜999の範囲に丸め（ダッシュボードの例に近い数）
+    return 100 + (h % 900);
   };
 
   const handleNext = async () => {
-    if (!current || !groupId || !participantId) return;
+    if (!currentImage || !groupId) return;
     if (index === 0 && ageBucket === "") return; // 初回は年齢必須
-    if (!allValuesSelected) return;
+    if (!allValuesSelected) return; // 全項目必須
 
     const nowIso = new Date().toISOString();
     const trialNo = index + 1;
-    const key = `${participantId}__g${groupId}__imgid:${current.id}`;
 
+    // 数値化して送る（gender/age_bucket を code で）
     const row = {
       timestamp: nowIso,
       participant_id: participantId,
       group_id: groupId,
-      image_id: current.id,
-      image: "",
-      gender: Number(gender ?? 0),
-      age_bucket: ageBucket === "" ? "" : Number(ageBucket),
+      trial_no: trialNo,
+      image: currentImage,              // 文字列（GAS側で保持）
+      image_id: imageIdFromPath(currentImage), // 追加：数値ID（重複対策にも可）
+      gender_code: GENDER_CODE[gender] ?? 0,
+      age_code: AGE_CODE[ageBucket] ?? 0,
       modest_luxury: values.modest_luxury,
       colorful_monochrome: values.colorful_monochrome,
       feminine_masculine: values.feminine_masculine,
@@ -319,29 +302,25 @@ function SurveyPage() {
       classic_modern: values.classic_modern,
       soft_hard: values.soft_hard,
       heavy_light: values.heavy_light,
-      trial_no: trialNo,
-      key,
+      key: `${nowIso}__${participantId}__g${groupId}__t${trialNo}`, // GAS 側の重複スキップにヒット
     };
 
     setIsSubmitting(true);
     await postOne(row);
     setIsSubmitting(false);
 
-    // ローカルにも保存（/image で自分のマーカーに使用）
-    saveMyAnswerSnapshot(row);
-
     setRecords((prev) => [...prev, row]);
 
     if (index + 1 < images.length) {
       setIndex((i) => i + 1);
-      setValues(pairs.reduce((acc, p) => ((acc[p.key] = null), acc), {}));
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      resetValuesForNext();
     } else {
       setIndex(images.length); // 完了
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
+  // 戻る
   const handleBack = () => {
     if (index === 0) return;
 
@@ -370,44 +349,22 @@ function SurveyPage() {
     setIndex((i) => Math.max(0, i - 1));
   };
 
+  // すべてリセット（最初に戻る）→ 新しい participant_id を発行
   const handleResetAll = () => {
-    // 新しい participant_id を発行
-    const pid = crypto.randomUUID();
-    sessionStorage.setItem("currentPid", pid);
-    setParticipantId(pid);
-
-    // 状態初期化
-    setValues(pairs.reduce((acc, p) => ((acc[p.key] = null), acc), {}));
-    setGender(0);
+    setValues(initialValues);
+    setGender("na");
     setAgeBucket("");
     setIndex(0);
     setRecords([]);
-
-    if (!lockedByQuery) {
-      // 次グループへ（ほぼ均等）
-      const last = parseInt(getCookie("lastGroup") || "0", 10);
-      const next = (last % 5) + 1;
-      setCookie("lastGroup", String(next));
-      setGroupId(next);
-      const p = new URLSearchParams(location.search);
-      p.delete("group");
-      history.replaceState(null, "", `${location.pathname}?${p.toString()}`);
-    }
-
+    const p = "p_" + uid();
+    setParticipantId(p);
+    setCookie("participant_id", p);
+    if (!lockedByQuery) setGroupId(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleClose = () => {
-    window.close();
-    setTimeout(() => {
-      try {
-        if (!document.hidden) location.href = "about:blank";
-      } catch {}
-    }, 200);
-  };
-
   const allDone = images.length > 0 && index >= images.length;
-  const canSubmit = current && allValuesSelected && (index !== 0 || ageBucket !== "");
+  const canSubmit = currentImage && allValuesSelected && (index !== 0 || ageBucket !== "");
 
   return (
     <div className="page">
@@ -420,11 +377,12 @@ function SurveyPage() {
         </p>
       </header>
 
+      {/* グループ選択（?group= が無いときのみ） */}
       {!groupId && (
         <section className="card">
           <Segmented
             label="評価グループ"
-            options={[1, 2, 3, 4, 5].map((n) => ({ label: String(n), value: n }))}
+            options={[1,2,3,4,5].map(n => ({label:String(n), value:n}))}
             value={null}
             onChange={(g) => {
               setGroupId(g);
@@ -433,31 +391,28 @@ function SurveyPage() {
               history.replaceState(null, "", `${location.pathname}?${p.toString()}`);
               setIndex(0);
               setRecords([]);
-              setValues(pairs.reduce((acc, p) => ((acc[p.key] = null), acc), {}));
+              setValues(initialValues);
+              setCookie("lastGroup", String(g));
             }}
           />
         </section>
       )}
 
+      {/* 本編 or サンクス */}
       {groupId && !allDone && (
         <>
           <section className="card">
             <div className="card-head">
               <strong>タンブラー画像</strong>
               {!lockedByQuery && (
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setGroupId(null)}
-                  title="グループを選び直す"
-                >
+                <button type="button" className="btn-ghost" onClick={() => setGroupId(null)} title="グループを選び直す">
                   グループ変更
                 </button>
               )}
             </div>
-            <div className={`img-wrap ${current?.aspect === "1x1" ? "sq" : "v23"}`}>
-              {current ? (
-                <img src={current.path} alt="タンブラー画像" className="stimulus" />
+            <div className="img-wrap">
+              {currentImage ? (
+                <img src={currentImage} alt="タンブラー画像" className="stimulus" />
               ) : (
                 <div style={{ padding: 16, color: "#666", fontSize: 14 }}>
                   画像が見つかりません（グループ{groupId}の画像配列を確認してください）
@@ -466,6 +421,7 @@ function SurveyPage() {
             </div>
           </section>
 
+          {/* 初回のみ：性別・年齢 */}
           {index === 0 && (
             <section className="card">
               <Segmented label="性別" options={genderOptions} value={gender} onChange={setGender} />
@@ -473,6 +429,7 @@ function SurveyPage() {
             </section>
           )}
 
+          {/* ガイド（1〜5は文言のみ・数値表示なし） */}
           <section className="card">
             <div className="scale-head global five">
               <div className="head-grid-5">
@@ -490,45 +447,23 @@ function SurveyPage() {
           </section>
 
           <div className="submit-bar">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={handleBack}
-              disabled={index === 0}
-              style={{ opacity: index === 0 ? 0.5 : 1 }}
-            >
+            <button type="button" className="btn-secondary" onClick={handleBack} disabled={index === 0} style={{ opacity: index === 0 ? 0.5 : 1 }}>
               戻る
             </button>
-
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={handleNext}
-              disabled={!canSubmit || isSubmitting}
-              style={{ opacity: !canSubmit || isSubmitting ? 0.5 : 1 }}
-            >
+            <button type="button" className="btn-primary" onClick={handleNext} disabled={!canSubmit || isSubmitting} style={{ opacity: !canSubmit || isSubmitting ? 0.5 : 1 }}>
               {index + 1 < images.length ? (isSubmitting ? "送信中…" : "次へ") : (isSubmitting ? "送信中…" : "完了")}
             </button>
           </div>
         </>
       )}
 
+      {/* 完了 → 「みんなの結果を見る」へ */}
       {groupId && allDone && (
         <section className="card" style={{ textAlign: "center", padding: "32px 16px" }}>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>ご回答ありがとうございました。</h2>
           <p style={{ color: "#666", marginTop: 0, marginBottom: 24 }}>ご協力に感謝いたします。</p>
-
           <div className="submit-bar" style={{ marginTop: 8 }}>
-            <button type="button" className="btn-secondary" onClick={handleResetAll}>
-              最初からやり直す
-            </button>
-            <button type="button" className="btn-primary" onClick={handleClose}>
-              アンケートを閉じる
-            </button>
-          </div>
-
-          <div style={{ marginTop: 16 }}>
-            {/* 新しいページに移動 */}
+            <button type="button" className="btn-secondary" onClick={handleResetAll}>最初からやり直す</button>
             <a className="btn-primary as-link" href={`/results?g=${groupId}`}>みんなの結果を見る</a>
           </div>
         </section>
@@ -537,58 +472,56 @@ function SurveyPage() {
   );
 }
 
-/** ===== /results （グループ写真一覧ページ） ===== */
+/** ====== ページ：グループ一覧（画像サムネの羅列） ====== */
 function ResultsPage() {
   const params = new URLSearchParams(location.search);
-  const g = params.get("g");
-  const groupId = g ? parseInt(g, 10) : null;
+  const g = parseInt(params.get("g") || "0", 10);
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [list, setList] = useState(null);
-
+  // 初回だけ読み込んでスナップショット表示（軽さ優先）
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!groupId) return;
-      const res = await fetch(`/api/summary?mode=list&g=${groupId}`);
-      const data = await res.json();
-      if (alive) setList(data);
-    })();
-    return () => (alive = false);
-  }, [groupId]);
+    const run = async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`${API_BASE}/summary?mode=list&g=${encodeURIComponent(g)}`);
+        const json = await r.json();
+        // GAS が image_id or image の両方を返すのでそのまま保持
+        setList(json.images || []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (g >= 1 && g <= 5) run();
+  }, [g]);
 
   return (
     <div className="page">
       <header className="topbar">
-        <h1 className="title">みんなの結果</h1>
-        <p className="subtitle">{groupId ? `グループ: ${groupId}` : "グループ未指定"}</p>
+        <h1 className="title">みんなの結果（グループ{g}）</h1>
+        <p className="subtitle">画像を選ぶと分布グラフが見られます</p>
       </header>
 
       <section className="card">
-        <div className="card-head">
-          <strong>写真一覧</strong>
-          <a className="btn-ghost" href="/">アンケートに戻る</a>
-        </div>
-
-        {!list ? (
-          <div style={{ padding: 16 }}>読み込み中…</div>
-        ) : (
+        {loading && <div>読み込み中…</div>}
+        {!loading && (
           <div className="grid">
-            {list.images.map((it) => {
-              const id = it.image_id ?? null;
-              const path = it.image ?? null;
-              // サムネは local の画像パスに寄せる（id→定義表から検索 / 無ければ it.image を使う）
-              const meta = id ? findMetaById(id) : (path ? findMetaByPath(path) : null);
-              const imgPath = meta ? meta.path : (path || "");
-              const aspect = meta ? meta.aspect : "2x3";
-              const href = id
-                ? `/image?g=${groupId}&image_id=${id}`
-                : `/image?g=${groupId}&image=${encodeURIComponent(path || "")}`;
-
+            {(list || []).map((rec, i) => {
+              const id = rec.image_id ?? null;
+              const path = rec.image ?? null;
+              const name = (path || `id-${id}` || `#${i}`).split("/").pop()?.replace(/\.[^.]+$/,"");
+              const href = id != null
+                ? `/image?g=${g}&image_id=${encodeURIComponent(id)}`
+                : `/image?g=${g}&image=${encodeURIComponent(path || "")}`;
+              const imgSrc = path || ""; // サムネは path があるときのみ表示
               return (
-                <a key={id ?? path} className="card thumb-card" href={href}>
-                  <div className={`thumb ${aspect === "1x1" ? "sq" : "v23"}`}>
-                    {imgPath ? <img src={imgPath} alt="" /> : <div style={{ padding: 16, color: "#666" }}>画像不明</div>}
+                <a className="card-thumb" href={href} key={`${id ?? path ?? i}`}>
+                  <div className={`thumb ${imgSrc.includes("/g") ? "" : ""}`}>
+                    {imgSrc ? <img loading="lazy" src={imgSrc} alt={name} /> : <div className="ph">NO PREVIEW</div>}
                   </div>
+                  <div className="iname" title={name}>{name}</div>
                 </a>
               );
             })}
@@ -599,48 +532,36 @@ function ResultsPage() {
   );
 }
 
-/** ===== /image （画像ごとの分布ページ） ===== */
+/** ====== ページ：画像別分布（棒グラフのみ／件数非表示） ====== */
 function ImagePage() {
   const params = new URLSearchParams(location.search);
-  const groupId = params.get("g") ? Number(params.get("g")) : null;
-  const imageId = params.get("image_id") ? Number(params.get("image_id")) : null;
-  const imagePath = params.get("image") ? decodeURIComponent(params.get("image")) : null;
+  const g = parseInt(params.get("g") || "0", 10);
+  const image_id = params.get("image_id");
+  const image = params.get("image");
 
-  // 画像メタ
-  const meta = imageId ? findMetaById(imageId) : (imagePath ? findMetaByPath(imagePath) : null);
-
-  const [detail, setDetail] = useState(null);
+  const [dist, setDist] = useState(null); // { counts: {pair: {'1':n..'5':n}} }
+  const [meta, setMeta] = useState({ path: null });
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!groupId) return;
-      const qs = imageId
-        ? `mode=image&g=${groupId}&image_id=${imageId}`
-        : `mode=image&g=${groupId}&image=${encodeURIComponent(imagePath || "")}`;
-      const res = await fetch(`/api/summary?${qs}`);
-      const data = await res.json();
-      if (alive) setDetail(data);
-    })();
-    return () => (alive = false);
-  }, [groupId, imageId, imagePath]);
+    const run = async () => {
+      const url = new URL(`${API_BASE}/summary`);
+      url.searchParams.set("mode", "image");
+      url.searchParams.set("g", String(g));
+      if (image_id) url.searchParams.set("image_id", String(image_id));
+      else if (image) url.searchParams.set("image", String(image));
+      const r = await fetch(url.toString(), { method: "GET" });
+      const json = await r.json();
+      setDist(json || null);
 
-  // 自分の回答（sessionStorage に保存したスナップショット）を読む
-  const [my, setMy] = useState(null);
-  useEffect(() => {
-    const pid = sessionStorage.getItem("currentPid");
-    if (!pid || !groupId || !imageId) return setMy(null);
-    const key = `answer::${pid}::g${groupId}::img${imageId}`;
-    try {
-      const obj = JSON.parse(sessionStorage.getItem(key) || "null");
-      setMy(obj);
-    } catch {
-      setMy(null);
-    }
-  }, [groupId, imageId]);
+      // パスの判定（GAS側の出力構造に合わせて推測）
+      const p = json?.image || json?.image_path || image || null;
+      setMeta({ path: p });
+    };
+    if (g >= 1 && g <= 5 && (image_id || image)) run();
+  }, [g, image_id, image]);
 
-  // 感性語対
-  const pairs = [
+  // 簡易レンダラー（SVG棒グラフ／件数は描かない）
+  const PAIRS = [
     { key: "modest_luxury", left: "控えめ", right: "豪華な" },
     { key: "colorful_monochrome", left: "カラフル", right: "モノクロ" },
     { key: "feminine_masculine", left: "女性らしい", right: "男性らしい" },
@@ -650,60 +571,79 @@ function ImagePage() {
     { key: "heavy_light", left: "重い", right: "軽い" },
   ];
 
+  const BarRow = ({ pair, bins }) => {
+    const total = bins.reduce((a,b)=>a+b,0);
+    const max = Math.max(1, ...bins);
+    const W = 360, H = 140, pad = 8;
+    const colW = (W - pad*2) / 5;
+    const rects = bins.map((n,i)=>{
+      const h = Math.round((n/max) * (H - pad*2 - 18));
+      const x = pad + i*colW + colW*0.15;
+      const bw = colW*0.7;
+      const y = H - pad - h;
+      return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" />`;
+    }).join("");
+
+    const svg = { __html: `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><g fill="#2563eb">${rects}</g></svg>` };
+
+    return (
+      <div className="row">
+        <div className="label left">{pair.left}</div>
+        <div className="bars">
+          <div dangerouslySetInnerHTML={svg} />
+          <div className="ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+        </div>
+        <div className="label right">{pair.right}</div>
+      </div>
+    );
+  };
+
+  // dist から対ごとの bins を作る
+  const rows = (dist && dist.counts)
+    ? PAIRS.map(p => {
+        const c = dist.counts[p.key] || {};
+        const bins = [1,2,3,4,5].map(v => Number(c[String(v)] || 0));
+        return <BarRow key={p.key} pair={p} bins={bins} />;
+      })
+    : <div>読み込み中…</div>;
+
+  const back = `/results?g=${g}`;
+
+  const name = (meta?.path || "").split("/").pop()?.replace(/\.[^.]+$/,"") || (image_id ? `id-${image_id}` : "");
+
   return (
     <div className="page">
       <header className="topbar">
         <h1 className="title">分布グラフ</h1>
-        <p className="subtitle">{groupId ? `グループ: ${groupId}` : ""}</p>
+        <p className="subtitle">画像: {name}{g ? ` ／ グループ ${g}` : ""}</p>
       </header>
 
       <section className="card">
-        <div className="card-head">
-          <strong>画像</strong>
-          <a className="btn-ghost" href={`/results?g=${groupId}`}>一覧に戻る</a>
-        </div>
-        <div className={`img-wrap ${meta?.aspect === "1x1" ? "sq" : "v23"}`}>
-          {meta?.path ? <img className="stimulus" src={meta.path} alt="" /> : <div style={{ padding: 16, color: "#666" }}>画像不明</div>}
+        <div className="img-wrap">
+          {meta?.path ? (
+            <img className="stimulus" src={meta.path} alt="" />
+          ) : (
+            <div style={{ padding: 16, color: "#666" }}>画像不明</div>
+          )}
         </div>
       </section>
 
-      <section className="card">
-        {!detail ? (
-          <div style={{ padding: 16 }}>読み込み中…</div>
-        ) : (
-          <div className="rows">
-            {pairs.map((p) => {
-              const counts = detail.counts?.[p.key] || { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
-              const bins = [1, 2, 3, 4, 5].map((v) => Number(counts[String(v)] || 0));
-              const maxN = Math.max(1, ...bins);
-              const myScore = my ? Number(my[p.key]) : null;
-
-              return (
-                <div className="row dist-row" key={p.key}>
-                  <div className="label-left">{p.left}</div>
-                  <div className="bars">
-                    {bins.map((n, i) => {
-                      const pct = (n / maxN) * 100;
-                      const mine = myScore === i + 1;
-                      return <div key={i} className={`bar ${mine ? "mine" : ""}`} style={{ height: `${Math.round(pct)}%` }} title={`${i + 1}: ${n}`} />;
-                    })}
-                    <div className="ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
-                  </div>
-                  <div className="label-right">{p.right}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      <section className="card rows-card">
+        {rows}
       </section>
+
+      <div className="submit-bar">
+        <a href={back} className="btn-secondary as-link">一覧に戻る</a>
+        <a href="/" className="btn-primary as-link">最初の画面へ</a>
+      </div>
     </div>
   );
 }
 
-/** 補助：id/path からメタを引く */
-function findMetaById(id) {
-  return Object.values(GROUP_IMAGES).flat().find((x) => x.id === id) || null;
-}
-function findMetaByPath(path) {
-  return Object.values(GROUP_IMAGES).flat().find((x) => x.path === path) || null;
+/** ===== ルーティング（超シンプル：pathnameで分岐） ===== */
+export default function App() {
+  const path = location.pathname || "/";
+  if (path === "/results") return <ResultsPage />;
+  if (path === "/image")   return <ImagePage />;
+  return <SurveyPage />;
 }
