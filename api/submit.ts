@@ -1,32 +1,34 @@
-// /api/submit.ts
-export const config = { runtime: "edge" };
+// @ts-nocheck
 
-export default async function handler(req: Request) {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ status: "error", message: "Method Not Allowed" }), {
-      status: 405, headers: { "Content-Type": "application/json" }
-    });
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
   }
 
   try {
     const GAS_ENDPOINT = process.env.GAS_ENDPOINT;
-    if (!GAS_ENDPOINT) throw new Error("Missing GAS_ENDPOINT env");
+    if (!GAS_ENDPOINT) throw new Error('Missing GAS_ENDPOINT env');
 
-    const body = await req.json();
+    // body は any の可能性があるので安全に扱う
+    const rawBody = (req.body ?? {}) as unknown;
+    const body =
+      typeof rawBody === 'string'
+        ? JSON.parse(rawBody)
+        : (rawBody as Record<string, unknown>);
 
-    const res = await fetch(GAS_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const r = await fetch(GAS_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      // Apps Script 側CORSは気にしない（サーバー→サーバー）
     });
 
-    // Apps Script は JSONテキストを返すのでそのまま返却
-    const text = await res.text();
-    return new Response(text, { status: 200, headers: { "Content-Type": "application/json" } });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ status: "error", message: String(err?.message || err) }), {
-      status: 500, headers: { "Content-Type": "application/json" }
-    });
+    const text = await r.text(); // GASはテキストJSONを返す
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(200).send(text);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ status: 'error', message: msg });
   }
 }
