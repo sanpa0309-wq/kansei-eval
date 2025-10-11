@@ -58,7 +58,7 @@ const IMAGE_ID_MAP = (() => {
   for (let g = 1; g <= 5; g++) {
     const arr = GROUP_IMAGES[g] || [];
     arr.forEach((p, i) => {
-      const id = g * 100 + (i + 1); // 101.., 201.., 301.., ...
+      const id = g * 100 + (i + 1); // 101.., 201.., ...
       map[p] = id;
     });
   }
@@ -73,7 +73,7 @@ const ID_TO_PATH = (() => {
   return inv;
 })();
 
-/** ===== Cookie helpers ===== */
+/** ===== Cookie helpers（participant_id には使わない） ===== */
 function getCookie(name) {
   if (typeof document === "undefined") return null;
   const arr = document.cookie ? document.cookie.split(";") : [];
@@ -171,32 +171,43 @@ function SurveyPage() {
   // 初期 group 決定
   const [groupId, setGroupId] = useState(null);
   const [lockedByQuery, setLockedByQuery] = useState(false);
+
+  // participant_id は sessionStorage でタブごとに独立
   const [participantId, setParticipantId] = useState("anon");
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+
+    // --- group 決定（?group=優先、無ければ cookie ローテ） ---
     const qg = params.get("group");
     const g = qg ? parseInt(qg, 10) : null;
     if (g && g >= 1 && g <= 5) {
       setGroupId(g);
       setLockedByQuery(true);
     } else {
-      // ほぼ均等ローテーション
       const last = parseInt(getCookie("lastGroup") || "0", 10);
       const next = ((isNaN(last) ? 0 : last) % 5) + 1;
       setGroupId(next);
       setCookie("lastGroup", String(next));
     }
-    const pid = params.get("pid");
-    if (pid) setParticipantId(String(pid));
-    else {
-      const saved = getCookie("participant_id");
-      if (saved) setParticipantId(saved);
-      else {
-        const p = "p_" + uid();
-        setParticipantId(p);
-        setCookie("participant_id", p);
+
+    // --- participant_id は sessionStorage を使用 ---
+    try {
+      const urlPid = params.get("pid");
+      if (urlPid) {
+        sessionStorage.setItem("participant_id", urlPid);
+        setParticipantId(urlPid);
+      } else {
+        let pid = sessionStorage.getItem("participant_id");
+        if (!pid) {
+          pid = "p_" + uid();
+          sessionStorage.setItem("participant_id", pid);
+        }
+        setParticipantId(pid);
       }
+    } catch {
+      const pid = "p_" + uid();
+      setParticipantId(pid);
     }
   }, []);
 
@@ -269,7 +280,7 @@ function SurveyPage() {
       heavy_light: rec.heavy_light ?? null,
     });
     if (rec.gender != null) {
-      setGender(rec.gender === 2 ? "female" : rec.gender === 1 ? "male" : "na");
+      setGender(rec.gender === 2 ? "女性" : rec.gender === 1 ? "男性" : "na"); // 表示用だが送信は数値
     }
   };
 
@@ -310,10 +321,10 @@ function SurveyPage() {
       participant_id: participantId,
       group_id: groupId,
       trial_no: trialNo,
-      // image は送らない（削除）
+      // image は送らない
       image_id: imageIdFromPath(currentImage),
-      gender: GENDER_CODE[gender] ?? 0,       // ← 数値化して gender フィールドへ
-      age_bucket: AGE_CODE[ageBucket] ?? 0,   // ← 数値化して age_bucket フィールドへ
+      gender: GENDER_CODE[gender === "女性" ? "female" : gender === "男性" ? "male" : gender] ?? 0,
+      age_bucket: AGE_CODE[ageBucket] ?? 0,
       modest_luxury: values.modest_luxury,
       colorful_monochrome: values.colorful_monochrome,
       feminine_masculine: values.feminine_masculine,
@@ -368,16 +379,16 @@ function SurveyPage() {
     setIndex((i) => Math.max(0, i - 1));
   };
 
-  // すべてリセット（最初から）→ 新しい participant_id を発行
+  // すべてリセット（最初から）→ 新しい participant_id を再発行（タブ内でも再スタートは別ID）
   const handleResetAll = () => {
     setValues(initialValues);
     setGender("na");
     setAgeBucket("");
     setIndex(0);
     setRecords([]);
-    const p = "p_" + uid();
-    setParticipantId(p);
-    setCookie("participant_id", p);
+    const newPid = "p_" + uid();
+    try { sessionStorage.setItem("participant_id", newPid); } catch {}
+    setParticipantId(newPid);
     if (!lockedByQuery) setGroupId(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -522,7 +533,6 @@ function ResultsPage() {
           {(list || []).map((rec) => {
             const id = rec.image_id ?? null;
             if (id == null) return null;
-
             // 画像パスは ID から逆引き（なければ非表示）
             const imgSrc = ID_TO_PATH[id] || null;
             if (!imgSrc) return null;
@@ -579,7 +589,7 @@ function ImagePage() {
 
         // 1) APIのパス
         let p = json?.image || json?.image_path || null;
-        // 2) 逆引き
+        // 2) 逆引き（ID→パス）
         if (!p) {
           const idNum = Number(image_id);
           p = ID_TO_PATH[idNum] || null;
