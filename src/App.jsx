@@ -123,8 +123,9 @@ function shuffleStable(arr, seedStr) {
   return a;
 }
 
-// 置き換え前：getCookie(...) の実装を全部削除して、↓に差し替え
+// Cookie helpers（安全版）
 function getCookie(name) {
+  if (typeof document === "undefined") return null;
   const arr = document.cookie ? document.cookie.split(";") : [];
   for (const raw of arr) {
     const [k, ...rest] = raw.trim().split("=");
@@ -133,6 +134,15 @@ function getCookie(name) {
     }
   }
   return null;
+}
+
+function setCookie(name, value, days = 365) {
+  if (typeof document === "undefined") return;
+  const d = new Date();
+  d.setTime(d.getTime() + days * 864e5);
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
+    value
+  )}; path=/; expires=${d.toUTCString()}`;
 }
 
 /** API base */
