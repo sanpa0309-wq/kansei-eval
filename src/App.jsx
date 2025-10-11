@@ -141,8 +141,7 @@ function Segmented({ label, options, value, onChange }) {
 }
 
 /** =========================
- *  Survey（アンケート本編）
- *  ルート "/" はこのページ！
+ *  Survey（アンケート本編）: "/"
  * ========================= */
 function SurveyPage() {
   const navigate = useNavigate();
@@ -473,9 +472,7 @@ function SurveyPage() {
   );
 }
 
-/** ===============
- *  結果一覧ページ
- * =============== */
+/** =============== 結果一覧ページ =============== */
 function ResultsPage() {
   const [searchParams] = useSearchParams();
   const g = Number(searchParams.get("g") || "1");
@@ -501,47 +498,47 @@ function ResultsPage() {
   return (
     <div className="page results">
       <h1>グループ {g} の結果</h1>
-      <div className="grid">
-        {(list || []).map((rec, i) => {
-          const id = rec.image_id ?? null;
-          const path = rec.image ?? null;
-          if (id == null) return null;
+      <section className="card">
+        <div className="grid">
+          {(list || []).map((rec, i) => {
+            const id = rec.image_id ?? null;
+            const path = rec.image ?? null;
+            if (id == null) return null;
 
-          const href = `/image?g=${g}&image_id=${encodeURIComponent(id)}`;
-          const imgSrc = path || "";
+            const href = `/image?g=${g}&image_id=${encodeURIComponent(id)}`;
+            const imgSrc = path || "";
 
-          const rememberPath = () => {
-            try {
-              const map = JSON.parse(sessionStorage.getItem("imgMap") || "{}");
-              map[String(id)] = imgSrc;
-              sessionStorage.setItem("imgMap", JSON.stringify(map));
-            } catch {}
-          };
+            const rememberPath = () => {
+              try {
+                const map = JSON.parse(sessionStorage.getItem("imgMap") || "{}");
+                map[String(id)] = imgSrc;
+                sessionStorage.setItem("imgMap", JSON.stringify(map));
+              } catch {}
+            };
 
-          return (
-            <a className="card-thumb" href={href} key={id} onClick={rememberPath}>
-              <div className="thumb">
-                {imgSrc ? (
-                  <img loading="lazy" src={imgSrc} alt="" />
-                ) : (
-                  <div className="ph">NO PREVIEW</div>
-                )}
-              </div>
-            </a>
-          );
-        })}
-      </div>
+            return (
+              <a className="card-thumb" href={href} key={id} onClick={rememberPath}>
+                <div className="thumb">
+                  {imgSrc ? (
+                    <img loading="lazy" src={imgSrc} alt="" />
+                  ) : (
+                    <div className="ph">NO PREVIEW</div>
+                  )}
+                </div>
+              </a>
+            );
+          })}
+        </div>
 
-      <div style={{ marginTop: 16 }}>
-        <Link className="btn-secondary as-link" to="/">アンケートに戻る</Link>
-      </div>
+        <div style={{ marginTop: 16 }}>
+          <Link className="btn-secondary as-link" to="/">アンケートに戻る</Link>
+        </div>
+      </section>
     </div>
   );
 }
 
-/** ===============
- *  画像別分布ページ
- * =============== */
+/** =============== 画像別分布ページ =============== */
 function ImagePage() {
   const [searchParams] = useSearchParams();
   const g = Number(searchParams.get("g") || "1");
@@ -580,7 +577,7 @@ function ImagePage() {
     if (g >= 1 && g <= 5 && image_id) run();
   }, [g, image_id]);
 
-  // 棒グラフ（5対・件数ラベル非表示）
+  // 棒グラフ（7ペア・件数ラベル非表示）
   const PAIRS = [
     { key: "modest_luxury", left: "控えめ", right: "豪華な" },
     { key: "colorful_monochrome", left: "カラフル", right: "モノクロ" },
@@ -626,16 +623,20 @@ function ImagePage() {
 
   return (
     <div className="page image">
-      <h1>分布グラフ</h1>
-      <p className="subtitle">{g ? `グループ ${g}` : ""}</p>
+      <header className="topbar">
+        <h1 className="title">分布グラフ</h1>
+        <p className="subtitle">{g ? `グループ ${g}` : ""}</p>
+      </header>
 
-      <div className="img-wrap">
-        {meta.path ? (
-          <img src={meta.path} alt="" className="stimulus" />
-        ) : (
-          <div className="ph">画像なし</div>
-        )}
-      </div>
+      <section className="card">
+        <div className="img-wrap">
+          {meta.path ? (
+            <img src={meta.path} alt="" className="stimulus" />
+          ) : (
+            <div className="ph">画像なし</div>
+          )}
+        </div>
+      </section>
 
       <section className="card rows-card">
         {rows}
