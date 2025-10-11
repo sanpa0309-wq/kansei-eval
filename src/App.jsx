@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useSearchParams, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useSearchParams } from "react-router-dom";
 import "./index.css";
 
 /** ===== API 基底 ===== */
@@ -49,6 +49,30 @@ const GROUP_IMAGES = {
   ],
 };
 
+/** ===== 固定 image_id ←→ パス　マップ =====
+ * g1: 101..106, g2: 201..206, ... g5: 501..506
+ * 並びは GROUP_IMAGES の順序に対応
+ */
+const IMAGE_ID_MAP = (() => {
+  const map = {};
+  for (let g = 1; g <= 5; g++) {
+    const arr = GROUP_IMAGES[g] || [];
+    arr.forEach((p, i) => {
+      const id = g * 100 + (i + 1); // 101.., 201.., 301.., ...
+      map[p] = id;
+    });
+  }
+  return map;
+})();
+
+const ID_TO_PATH = (() => {
+  const inv = {};
+  Object.entries(IMAGE_ID_MAP).forEach(([path, id]) => {
+    inv[id] = path;
+  });
+  return inv;
+})();
+
 /** ===== Cookie helpers ===== */
 function getCookie(name) {
   if (typeof document === "undefined") return null;
@@ -81,7 +105,7 @@ const shuffle = (arr) => {
   return a;
 };
 
-// 数値化マップ（送信軽量化）
+// 数値化（送信軽量化）: 送信キー名は gender / age_bucket そのまま
 const GENDER_CODE = { male: 1, female: 2, na: 0 };
 const AGE_CODE = {
   "0-9": 1, "10-19": 2, "20-29": 3, "30-39": 4, "40-49": 5,
@@ -144,8 +168,6 @@ function Segmented({ label, options, value, onChange }) {
  *  Survey（アンケート本編）: "/"
  * ========================= */
 function SurveyPage() {
-  const navigate = useNavigate();
-
   // 初期 group 決定
   const [groupId, setGroupId] = useState(null);
   const [lockedByQuery, setLockedByQuery] = useState(false);
@@ -246,7 +268,9 @@ function SurveyPage() {
       soft_hard: rec.soft_hard ?? null,
       heavy_light: rec.heavy_light ?? null,
     });
-    if (rec.gender_code != null) setGender(rec.gender_code === 2 ? "female" : rec.gender_code === 1 ? "male" : "na");
+    if (rec.gender != null) {
+      setGender(rec.gender === 2 ? "female" : rec.gender === 1 ? "male" : "na");
+    }
   };
 
   const allValuesSelected = useMemo(
@@ -270,13 +294,8 @@ function SurveyPage() {
     }
   };
 
-  // 簡易 image_id（path→数値）
-  const imageIdFromPath = (p) => {
-    if (!p) return null;
-    let h = 0;
-    for (let i = 0; i < p.length; i++) h = (h * 31 + p.charCodeAt(i)) >>> 0;
-    return 100 + (h % 900);
-  };
+  // 固定 ID 取得（必ず安定したID）
+  const imageIdFromPath = (p) => (p in IMAGE_ID_MAP ? IMAGE_ID_MAP[p] : null);
 
   const handleNext = async () => {
     if (!currentImage || !groupId) return;
@@ -291,10 +310,10 @@ function SurveyPage() {
       participant_id: participantId,
       group_id: groupId,
       trial_no: trialNo,
-      image: currentImage,
+      // image は送らない（削除）
       image_id: imageIdFromPath(currentImage),
-      gender_code: GENDER_CODE[gender] ?? 0,
-      age_code: AGE_CODE[ageBucket] ?? 0,
+      gender: GENDER_CODE[gender] ?? 0,       // ← 数値化して gender フィールドへ
+      age_bucket: AGE_CODE[ageBucket] ?? 0,   // ← 数値化して age_bucket フィールドへ
       modest_luxury: values.modest_luxury,
       colorful_monochrome: values.colorful_monochrome,
       feminine_masculine: values.feminine_masculine,
@@ -500,13 +519,15 @@ function ResultsPage() {
       <h1>グループ {g} の結果</h1>
       <section className="card">
         <div className="grid">
-          {(list || []).map((rec, i) => {
+          {(list || []).map((rec) => {
             const id = rec.image_id ?? null;
-            const path = rec.image ?? null;
             if (id == null) return null;
 
+            // 画像パスは ID から逆引き（なければ非表示）
+            const imgSrc = ID_TO_PATH[id] || null;
+            if (!imgSrc) return null;
+
             const href = `/image?g=${g}&image_id=${encodeURIComponent(id)}`;
-            const imgSrc = path || "";
 
             const rememberPath = () => {
               try {
@@ -519,11 +540,7 @@ function ResultsPage() {
             return (
               <a className="card-thumb" href={href} key={id} onClick={rememberPath}>
                 <div className="thumb">
-                  {imgSrc ? (
-                    <img loading="lazy" src={imgSrc} alt="" />
-                  ) : (
-                    <div className="ph">NO PREVIEW</div>
-                  )}
+                  <img loading="lazy" src={imgSrc} alt="" />
                 </div>
               </a>
             );
@@ -560,7 +577,14 @@ function ImagePage() {
 
         setDist(json || null);
 
+        // 1) APIのパス
         let p = json?.image || json?.image_path || null;
+        // 2) 逆引き
+        if (!p) {
+          const idNum = Number(image_id);
+          p = ID_TO_PATH[idNum] || null;
+        }
+        // 3) sessionStorage フォールバック
         if (!p) {
           try {
             const map = JSON.parse(sessionStorage.getItem("imgMap") || "{}");
@@ -577,7 +601,7 @@ function ImagePage() {
     if (g >= 1 && g <= 5 && image_id) run();
   }, [g, image_id]);
 
-  // 棒グラフ（7ペア・件数ラベル非表示）
+  // 棒グラフ（7ペア）
   const PAIRS = [
     { key: "modest_luxury", left: "控えめ", right: "豪華な" },
     { key: "colorful_monochrome", left: "カラフル", right: "モノクロ" },
@@ -655,7 +679,6 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* デフォルトはアンケート */}
         <Route path="/" element={<SurveyPage />} />
         <Route path="/results" element={<ResultsPage />} />
         <Route path="/image" element={<ImagePage />} />
