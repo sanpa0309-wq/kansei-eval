@@ -123,25 +123,40 @@ function SurveyPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    // group
-    const qg = params.get("group"); const g = qg ? parseInt(qg,10) : null;
-    if (g && g>=1 && g<=5) { setGroupId(g); setLockedByQuery(true); }
-    else {
+
+    // --- group 決定（?group=優先、無ければ cookie ローテ） ---
+    const qg = params.get("group");
+    const g = qg ? parseInt(qg, 10) : null;
+    if (g && g >= 1 && g <= 5) {
+      setGroupId(g);
+      setLockedByQuery(true);
+    } else {
       const last = parseInt(getCookie("lastGroup") || "0", 10);
-      const next = ((isNaN(last)?0:last) % 5) + 1;
-      setGroupId(next); setCookie("lastGroup", String(next));
+      const next = ((isNaN(last) ? 0 : last) % 5) + 1;
+      setGroupId(next);
+      setCookie("lastGroup", String(next));
     }
-    // participant_id = sessionStorage（タブごと）
+
+      // --- participant_id は sessionStorage を使用（タブごとに独立） ---
     try {
       const urlPid = params.get("pid");
-      if (urlPid) { sessionStorage.setItem("participant_id", urlPid); setParticipantId(urlPid); }
-      else {
+      if (urlPid) {
+        sessionStorage.setItem("participant_id", urlPid);
+        etParticipantId(urlPid);
+      } else {
         let pid = sessionStorage.getItem("participant_id");
-        if (!pid) { pid = "p_"+uid(); sessionStorage.setItem("participant_id", pid); }
+        if (!pid) {
+          pid = "p_" + uid();
+          sessionStorage.setItem("participant_id", pid);
+        }
         setParticipantId(pid);
       }
-    } catch { setParticipantId("p_"+uid()); }
+    } catch {
+      const pid = "p_" + uid();
+      setParticipantId(pid);
+    }
   }, []);
+
 
   const pairs = useMemo(()=>[
     { key:"modest_luxury", left:"控えめ", right:"豪華な" },
@@ -251,11 +266,23 @@ function SurveyPage() {
   };
 
   const handleResetAll = () => {
-    setValues(initialValues); setGender("na"); setAgeBucket(""); setIndex(0); setRecords([]);
-    const newPid = "p_"+uid(); try{ sessionStorage.setItem("participant_id", newPid); }catch{} setParticipantId(newPid);
+    setValues(initialValues);
+    setGender("na");
+    setAgeBucket("");
+    setIndex(0);
+    setRecords([]);
+
+  // ← ここで新しい participant_id を必ず再発行（タブ内再スタートでも別ID）
+    const newPid = "p_" + uid();
+    try {
+      sessionStorage.setItem("participant_id", newPid);
+    } catch {}
+    setParticipantId(newPid); // state も更新（ここが超重要）
+
     if (!lockedByQuery) setGroupId(null);
-    window.scrollTo({top:0,behavior:"smooth"});
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
 
   const allDone = images.length>0 && index>=images.length;
   const canSubmit = currentImage && allValuesSelected && (index!==0 || ageBucket!== "");
