@@ -496,33 +496,19 @@ function ImagePage() {
     const colW = (W - pad*2) / 5;
 
     const rects = bins.map((n,i)=>{
-      const h = Math.round((n/max) * (H - pad*2 - 18));
+      const h = Math.round((n/max)*(H - pad*2 - 18));
       const x = pad + i*colW + colW*0.15;
       const bw = colW*0.7;
       const y = H - pad - h;
-      return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" />`;
+      const isUser = myVal === (i+1);
+      const color = isUser ? "#facc15" : "#2563eb"; // 自分の評価は黄色
+      return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" fill="${color}" />`;
     }).join("");
 
-    // マーカー（三角形）
-    let marker = '';
-    if (myVal>=1 && myVal<=5) {
-      const i = myVal - 1;
-      const cx = pad + i*colW + colW*0.5;
-      const baseY = H - pad + 6;
-      const size = 6;
-      marker = `<path d="M ${cx} ${baseY} l ${-size} ${-size} l ${size*2} 0 Z" />`;
-    }
+    const svg = {__html:`<svg viewBox="0 0 ${W} ${H}" width="100%" height="auto">${rects}</svg>`};
 
-    const svg = {
-      __html:
-        `<svg viewBox="0 0 ${W} ${H}" width="100%" height="auto" preserveAspectRatio="xMidYMid meet">
-           <g fill="#2563eb">${rects}</g>
-           <g fill="#ff6b00">${marker}</g>
-         </svg>`
-    };
-
-    return (
-      <div className="row">
+      return (
+        <div className="row">
         <div className="label left">{pair.left}</div>
         <div className="bars">
           <div dangerouslySetInnerHTML={svg} />
