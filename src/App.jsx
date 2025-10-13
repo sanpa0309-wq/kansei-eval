@@ -49,7 +49,7 @@ const GROUP_IMAGES = {
   ],
 };
 
-/** ===== 固定 image_id ←→ パス　マップ ===== */
+/** ===== image_id ←→ パス　相互マップ ===== */
 const IMAGE_ID_MAP = (() => {
   const map = {};
   for (let g = 1; g <= 5; g++) {
@@ -59,7 +59,7 @@ const IMAGE_ID_MAP = (() => {
 })();
 const ID_TO_PATH = Object.fromEntries(Object.entries(IMAGE_ID_MAP).map(([p,id]) => [id, p]));
 
-/** ===== Cookie helpers（participant_id には使わない） ===== */
+/** ===== Cookie helpers（groupローテ用） ===== */
 function getCookie(name) {
   if (typeof document === "undefined") return null;
   const arr = document.cookie ? document.cookie.split(";") : [];
@@ -137,12 +137,12 @@ function SurveyPage() {
       setCookie("lastGroup", String(next));
     }
 
-      // --- participant_id は sessionStorage を使用（タブごとに独立） ---
+    // --- participant_id は sessionStorage（タブ単位で独立） ---
     try {
       const urlPid = params.get("pid");
       if (urlPid) {
         sessionStorage.setItem("participant_id", urlPid);
-        etParticipantId(urlPid);
+        setParticipantId(urlPid);
       } else {
         let pid = sessionStorage.getItem("participant_id");
         if (!pid) {
@@ -156,7 +156,6 @@ function SurveyPage() {
       setParticipantId(pid);
     }
   }, []);
-
 
   const pairs = useMemo(()=>[
     { key:"modest_luxury", left:"控えめ", right:"豪華な" },
@@ -200,9 +199,6 @@ function SurveyPage() {
       soft_hard: rec.soft_hard ?? null,
       heavy_light: rec.heavy_light ?? null,
     });
-    if (rec.gender != null) {
-      // 表示ラベルは使わないのでスキップ
-    }
   };
 
   const allValuesSelected = useMemo(()=>pairs.every(p=>values[p.key]!=null),[pairs,values]);
@@ -213,6 +209,7 @@ function SurveyPage() {
       const r = await fetch(`${API_BASE}/submit`, {
         method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify(row)
       });
+      // GASのレスポンスを一応読む（エラー可視化用）
       await r.text();
     } catch(e){ console.warn("submit ignored:", e); }
   };
@@ -242,6 +239,7 @@ function SurveyPage() {
       classic_modern: values.classic_modern,
       soft_hard: values.soft_hard,
       heavy_light: values.heavy_light,
+      // 重複ガード用（任意）
       key: `${nowIso}__${participantId}__g${groupId}__t${trialNo}`,
     };
 
@@ -266,23 +264,27 @@ function SurveyPage() {
   };
 
   const handleResetAll = () => {
+    // UIの状態リセット
     setValues(initialValues);
     setGender("na");
     setAgeBucket("");
     setIndex(0);
     setRecords([]);
 
-  // ← ここで新しい participant_id を必ず再発行（タブ内再スタートでも別ID）
+    // 新しい participant_id を発行して保存
     const newPid = "p_" + uid();
-    try {
-      sessionStorage.setItem("participant_id", newPid);
-    } catch {}
-    setParticipantId(newPid); // state も更新（ここが超重要）
+    try { sessionStorage.setItem("participant_id", newPid); } catch {}
+    setParticipantId(newPid);
 
-    if (!lockedByQuery) setGroupId(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // ?pid や ?group は消してトップへ
+    if (!lockedByQuery) {
+      const base = location.pathname; // e.g. "/"
+      history.replaceState(null, "", base);
+    }
+
+    // ★ 確実に新IDで再スタート
+    location.reload();
   };
-
 
   const allDone = images.length>0 && index>=images.length;
   const canSubmit = currentImage && allValuesSelected && (index!==0 || ageBucket!== "");
@@ -371,52 +373,46 @@ function SurveyPage() {
   );
 }
 
-/** ===== 結果一覧："/results" ===== */
+/** ===== 結果一覧："/results"（フロント定義から確実に表示） ===== */
 function ResultsPage() {
   const [searchParams] = useSearchParams();
   const g = Number(searchParams.get("g") || "1");
-  const [list, setList] = useState(null);
+  const images = useMemo(() => (GROUP_IMAGES[g] || []), [g]);
 
-  useEffect(() => {
-    const run = async () => {
-      try {
-        const url = new URL(`${API_BASE}/summary`, location.origin);
-        url.searchParams.set("mode", "list");
-        url.searchParams.set("g", String(g));
-        const r = await fetch(url.toString());
-        const json = await r.json();
-        setList(json?.images || []);
-      } catch (e) {
-        console.error(e); setList([]);
-      }
-    };
-    if (g>=1 && g<=5) run();
-  }, [g]);
+  if (!(g >= 1 && g <= 5)) {
+    return (
+      <div className="page results">
+        <h1>グループ {String(searchParams.get("g") || "")} の結果</h1>
+        <section className="card">不正なグループです。</section>
+        <div style={{ marginTop: 16 }}>
+          <Link className="btn-secondary as-link" to="/">アンケートに戻る</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page results">
       <h1>グループ {g} の結果</h1>
       <section className="card">
         <div className="grid">
-          {(list||[]).map(rec=>{
-            const id = rec.image_id ?? null;
-            if (id==null) return null;
-            const imgSrc = ID_TO_PATH[id] || null;
-            if (!imgSrc) return null;
-            const href = `/image?g=${g}&image_id=${encodeURIComponent(id)}`;
+          {images.map((imgPath) => {
+            const image_id = IMAGE_ID_MAP[imgPath];
+            if (image_id == null) return null;
+            const href = `/image?g=${g}&image_id=${encodeURIComponent(image_id)}`;
 
             const rememberPath = () => {
               try {
                 const map = JSON.parse(sessionStorage.getItem("imgMap") || "{}");
-                map[String(id)] = imgSrc;
+                map[String(image_id)] = imgPath;
                 sessionStorage.setItem("imgMap", JSON.stringify(map));
               } catch {}
             };
 
             return (
-              <a className="card-thumb" href={href} key={id} onClick={rememberPath}>
+              <a className="card-thumb" href={href} key={image_id} onClick={rememberPath}>
                 <div className="thumb">
-                  <img loading="lazy" src={imgSrc} alt="" />
+                  <img loading="lazy" src={imgPath} alt="" />
                 </div>
               </a>
             );
@@ -456,6 +452,7 @@ function ImagePage() {
         setDist(json || null);
         setUserValue(json?.user_value || null);
 
+        // 画像パスの解決（API→固定マップ→セッションキャッシュ）
         let p = json?.image || json?.image_path || null;
         if (!p) p = ID_TO_PATH[Number(image_id)] || null;
         if (!p) {
