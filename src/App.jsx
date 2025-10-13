@@ -604,8 +604,16 @@ function ImagePage() {
           {meta.path ? <img src={meta.path} alt="" className="stimulus" /> : <div className="ph">画像なし</div>}
         </div>
       </section>
-
-      <section className="card rows-card">
+      <p style={{
+        textAlign: "center",
+        marginTop: "8px",
+        marginBottom: "12px",
+        fontSize: "14px",
+        color: "#666"
+      }}>
+        ※黄色のグラフがあなたの回答
+      </p>      
+              <section className="card rows-card">
         {rows}
       </section>
 
