@@ -525,27 +525,33 @@ function ImagePage() {
   ];
 
   // --- 自分の値を黄色に塗る版の棒グラフ ---
+  // --- ここから BarRow 置換 ---
   const BarRow = ({ pair, bins, myVal }) => {
     const max = Math.max(1, ...bins);
     const W = 360, H = 120, pad = 8;
-    const colW = (W - pad*2) / 5;
-    const my = Number(myVal); // 型ゆれ対策
+    const colW = (W - pad * 2) / 5;
+    const my = Number(myVal); // 型ゆれ対策（"3" でも 3 と比較できる）
 
-    const rects = bins.map((n,i)=>{
-      const h = Math.round((n/max) * (H - pad*2 - 18));
-      const x = pad + i*colW + colW*0.15;
-      const bw = colW*0.7;
-      const y = H - pad - h;
-      const isUser = my === (i + 1);
-      const color = isUser ? "#facc15" : "#2563eb"; // 自分の評価は黄色
-      return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" fill="${color}" />`;
-    }).join("");
+    const rects = bins
+      .map((n, i) => {
+        const h = Math.round((n / max) * (H - pad * 2 - 18));
+        const x = pad + i * colW + colW * 0.15;
+        const bw = colW * 0.7;
+        const y = H - pad - h;
+        const isUser = my === i + 1;             // ← 自分の列
+        const color = isUser ? "#facc15" : "#2563eb"; // 自分だけ黄色、他は青
+        return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" fill="${color}" />`;
+      })
+      .join("");
 
+    // height="auto" は NG。代わりに viewBox + CSS style で可変にする
     const svg = {
-      __html:
-        `<svg viewBox="0 0 ${W} ${H}" width="100%" height="auto" preserveAspectRatio="xMidYMid meet">
-           ${rects}
-         </svg>`
+      __html: `
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
+            style="width:100%;height:auto;display:block">
+          ${rects}
+        </svg>
+      `,
     };
 
     return (
@@ -553,12 +559,15 @@ function ImagePage() {
         <div className="label left">{pair.left}</div>
         <div className="bars">
           <div dangerouslySetInnerHTML={svg} />
-          <div className="ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+          <div className="ticks">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+          </div>
         </div>
         <div className="label right">{pair.right}</div>
       </div>
     );
   };
+  // --- ここまで BarRow 置換 ---
 
   const rows = (dist && dist.counts)
     ? PAIRS.map(p=>{
