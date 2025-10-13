@@ -253,10 +253,11 @@ function SurveyPage() {
     setRecords(prev=>[...prev,row]);
 
     // === 自分の回答をローカル保存（/image で user_value が無い時のフォールバック用） ===
+    // === 自分の回答をローカル保存（/image での黄色フォールバック） ===
     try {
-      const key = `${row.participant_id}::${row.image_id}`;
-      const obj = JSON.parse(sessionStorage.getItem("answersByImage") || "{}");
-      obj[key] = {
+      const byPidKey = `${row.participant_id}::${row.image_id}`;
+      const byPid = JSON.parse(sessionStorage.getItem("answersByImage") || "{}");
+      byPid[byPidKey] = {
         modest_luxury: row.modest_luxury,
         colorful_monochrome: row.colorful_monochrome,
         feminine_masculine: row.feminine_masculine,
@@ -265,8 +266,14 @@ function SurveyPage() {
         soft_hard: row.soft_hard,
         heavy_light: row.heavy_light,
       };
-      sessionStorage.setItem("answersByImage", JSON.stringify(obj));
+      sessionStorage.setItem("answersByImage", JSON.stringify(byPid));
+
+      // ★ image_id 単位でも直近回答を保存（IDが変わっても拾える）
+      const byImage = JSON.parse(sessionStorage.getItem("answersByImageLatest") || "{}");
+      byImage[String(row.image_id)] = byPid[byPidKey];
+      sessionStorage.setItem("answersByImageLatest", JSON.stringify(byImage));
     } catch {}
+
 
     if (index+1 < images.length) { setIndex(i=>i+1); resetValuesForNext(); }
     else { setIndex(images.length); window.scrollTo({top:0,behavior:"smooth"}); }
@@ -385,9 +392,10 @@ function SurveyPage() {
           <div className="submit-bar" style={{ marginTop:8 }}>
             <button type="button" className="btn-secondary" onClick={handleResetAll}>最初からやり直す</button>
             {/* ここは pid 更新を確実にしたいのでハード遷移 */}
-            <button type="button" className="btn-primary" onClick={() => renewParticipantAndGo(`/results?g=${groupId}`)}>
-              みんなの結果を見る
-            </button>
+            <Link className="btn-primary as-link" to={`/results?g=${groupId}`}>
+                みんなの結果を見る
+            </Link>
+
           </div>
         </section>
       )}
@@ -477,15 +485,20 @@ function ImagePage() {
 
         setDist(json || null);
 
-        // --- user_value: サーバ値が無ければローカルフォールバック ---
+        // --- user_value: サーバ値 → (pid,image) ローカル → image 単位ローカル の順に探す ---
         let uv = json?.user_value || null;
-        if (!uv) {
-          try {
-            const obj = JSON.parse(sessionStorage.getItem("answersByImage") || "{}");
-            const local = obj[`${pid}::${String(image_id)}`];
-            if (local) uv = local;
-          } catch {}
-        }
+        try {
+          if (!uv) {
+            const pid = sessionStorage.getItem("participant_id") || "";
+            const byPid = JSON.parse(sessionStorage.getItem("answersByImage") || "{}");
+            uv = byPid[`${pid}::${String(image_id)}`] || null;
+          }
+          if (!uv) {
+            const byImage = JSON.parse(sessionStorage.getItem("answersByImageLatest") || "{}");
+            uv = byImage[String(image_id)] || null;
+          }
+        } catch {}
+
         if (uv) {
           const norm = {};
           for (const k of ["modest_luxury","colorful_monochrome","feminine_masculine","complex_simple","classic_modern","soft_hard","heavy_light"]) {
@@ -496,6 +509,7 @@ function ImagePage() {
         } else {
           setUserValue(null);
         }
+
 
         // 画像パスの解決（API→固定マップ→セッションキャッシュ）
         let p = json?.image || json?.image_path || null;
@@ -530,7 +544,7 @@ function ImagePage() {
     const max = Math.max(1, ...bins);
     const W = 360, H = 120, pad = 8;
     const colW = (W - pad * 2) / 5;
-    const my = Number(myVal); // 型ゆれ対策（"3" でも 3 と比較できる）
+    const my = Number(myVal); // 型ゆれ対策
 
     const rects = bins
       .map((n, i) => {
@@ -538,13 +552,12 @@ function ImagePage() {
         const x = pad + i * colW + colW * 0.15;
         const bw = colW * 0.7;
         const y = H - pad - h;
-        const isUser = my === i + 1;             // ← 自分の列
-        const color = isUser ? "#facc15" : "#2563eb"; // 自分だけ黄色、他は青
+        const isUser = my === (i + 1);
+        const color = isUser ? "#facc15" : "#2563eb"; // 自分だけ黄色
         return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" fill="${color}" />`;
       })
       .join("");
 
-    // height="auto" は NG。代わりに viewBox + CSS style で可変にする
     const svg = {
       __html: `
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
@@ -567,6 +580,7 @@ function ImagePage() {
       </div>
     );
   };
+
   // --- ここまで BarRow 置換 ---
 
   const rows = (dist && dist.counts)
