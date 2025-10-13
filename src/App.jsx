@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useSearchParams } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useSearchParams, useNavigate } from "react-router-dom";
 import "./index.css";
 
 /** ===== API 基底 ===== */
@@ -49,7 +49,7 @@ const GROUP_IMAGES = {
   ],
 };
 
-/** ===== image_id ←→ パス　相互マップ ===== */
+/** ===== image_id ←→ パス 相互マップ ===== */
 const IMAGE_ID_MAP = (() => {
   const map = {};
   for (let g = 1; g <= 5; g++) {
@@ -81,7 +81,15 @@ const shuffle = (arr) => { const a = arr.slice(); for (let i=a.length-1;i>0;i--)
 const GENDER_CODE = { male: 1, female: 2, na: 0 };
 const AGE_CODE = { "0-9":1,"10-19":2,"20-29":3,"30-39":4,"40-49":5,"50-59":6,"60-69":7,"70-":8,"":0 };
 
-/** ===== スケール行（丸ボタン・数値非表示） ===== */
+/** ===== participant_id 再発行ヘルパ ===== */
+function renewParticipantAndGo(to) {
+  const newPid = "p_" + uid();
+  try { sessionStorage.setItem("participant_id", newPid); } catch {}
+  // SPA遷移より確実に反映したい時はハード遷移にする
+  location.href = to;
+}
+
+/** ===== スケール行 ===== */
 function ScaleRow({ pair, value, onChange }) {
   const nums = [1,2,3,4,5];
   return (
@@ -98,7 +106,7 @@ function ScaleRow({ pair, value, onChange }) {
   );
 }
 
-/** ===== セグメントボタン ===== */
+/** ===== セグメント ===== */
 function Segmented({ label, options, value, onChange }) {
   return (
     <div className="seg-row">
@@ -137,7 +145,7 @@ function SurveyPage() {
       setCookie("lastGroup", String(next));
     }
 
-    // --- participant_id は sessionStorage（タブ単位で独立） ---
+    // --- participant_id は sessionStorage（タブ単位） ---
     try {
       const urlPid = params.get("pid");
       if (urlPid) {
@@ -209,7 +217,6 @@ function SurveyPage() {
       const r = await fetch(`${API_BASE}/submit`, {
         method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify(row)
       });
-      // GASのレスポンスを一応読む（エラー可視化用）
       await r.text();
     } catch(e){ console.warn("submit ignored:", e); }
   };
@@ -239,7 +246,6 @@ function SurveyPage() {
       classic_modern: values.classic_modern,
       soft_hard: values.soft_hard,
       heavy_light: values.heavy_light,
-      // 重複ガード用（任意）
       key: `${nowIso}__${participantId}__g${groupId}__t${trialNo}`,
     };
 
@@ -264,25 +270,23 @@ function SurveyPage() {
   };
 
   const handleResetAll = () => {
-    // UIの状態リセット
+    // UIリセット
     setValues(initialValues);
     setGender("na");
     setAgeBucket("");
     setIndex(0);
     setRecords([]);
 
-    // 新しい participant_id を発行して保存
+    // ★ participant_id 再発行
     const newPid = "p_" + uid();
     try { sessionStorage.setItem("participant_id", newPid); } catch {}
-    setParticipantId(newPid);
 
-    // ?pid や ?group は消してトップへ
+    // ?pid, ?group を消してトップへ（lockedByQuery なら group は維持）
     if (!lockedByQuery) {
-      const base = location.pathname; // e.g. "/"
+      const base = location.pathname; // "/"
       history.replaceState(null, "", base);
     }
-
-    // ★ 確実に新IDで再スタート
+    // 確実に新ID反映
     location.reload();
   };
 
@@ -365,7 +369,10 @@ function SurveyPage() {
           <p style={{color:"#666", marginTop:0, marginBottom:24}}>ご協力に感謝いたします。</p>
           <div className="submit-bar" style={{ marginTop:8 }}>
             <button type="button" className="btn-secondary" onClick={handleResetAll}>最初からやり直す</button>
-            <Link className="btn-primary as-link" to={`/results?g=${groupId}`}>みんなの結果を見る</Link>
+            {/* ここは SPA Link でも良いが、pid更新を確実にしたいのでハード遷移 */}
+            <button type="button" className="btn-primary" onClick={() => renewParticipantAndGo(`/results?g=${groupId}`)}>
+              みんなの結果を見る
+            </button>
           </div>
         </section>
       )}
@@ -373,7 +380,7 @@ function SurveyPage() {
   );
 }
 
-/** ===== 結果一覧："/results"（フロント定義から確実に表示） ===== */
+/** ===== 結果一覧："/results" ===== */
 function ResultsPage() {
   const [searchParams] = useSearchParams();
   const g = Number(searchParams.get("g") || "1");
@@ -385,7 +392,8 @@ function ResultsPage() {
         <h1>グループ {String(searchParams.get("g") || "")} の結果</h1>
         <section className="card">不正なグループです。</section>
         <div style={{ marginTop: 16 }}>
-          <Link className="btn-secondary as-link" to="/">アンケートに戻る</Link>
+          {/* ここも pid 更新してから戻る */}
+          <button className="btn-secondary" onClick={() => renewParticipantAndGo("/")}>アンケートに戻る</button>
         </div>
       </div>
     );
@@ -420,7 +428,10 @@ function ResultsPage() {
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <Link className="btn-secondary as-link" to="/">アンケートに戻る</Link>
+          {/* ★ アンケートへ戻る時も pid 再発行 */}
+          <button className="btn-secondary" onClick={() => renewParticipantAndGo("/")}>
+            アンケートに戻る
+          </button>
         </div>
       </section>
     </div>
@@ -452,7 +463,6 @@ function ImagePage() {
         setDist(json || null);
         setUserValue(json?.user_value || null);
 
-        // 画像パスの解決（API→固定マップ→セッションキャッシュ）
         let p = json?.image || json?.image_path || null;
         if (!p) p = ID_TO_PATH[Number(image_id)] || null;
         if (!p) {
@@ -498,7 +508,7 @@ function ImagePage() {
     if (myVal>=1 && myVal<=5) {
       const i = myVal - 1;
       const cx = pad + i*colW + colW*0.5;
-      const baseY = H - pad + 6; // 棒の下ちょい下
+      const baseY = H - pad + 6;
       const size = 6;
       marker = `<path d="M ${cx} ${baseY} l ${-size} ${-size} l ${size*2} 0 Z" />`;
     }
@@ -551,7 +561,10 @@ function ImagePage() {
 
       <div className="submit-bar">
         <Link to={`/results?g=${g}`} className="btn-secondary as-link">一覧に戻る</Link>
-        <Link to="/" className="btn-primary as-link">アンケートへ</Link>
+        {/* ★ ここも pid 再発行してからアンケートへ */}
+        <button className="btn-primary" onClick={() => renewParticipantAndGo("/")}>
+          アンケートへ
+        </button>
       </div>
     </div>
   );
