@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useSearchParams, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useSearchParams } from "react-router-dom";
 import "./index.css";
 
 /** ===== API 基底 ===== */
@@ -85,11 +85,11 @@ const AGE_CODE = { "0-9":1,"10-19":2,"20-29":3,"30-39":4,"40-49":5,"50-59":6,"60
 function renewParticipantAndGo(to) {
   const newPid = "p_" + uid();
   try { sessionStorage.setItem("participant_id", newPid); } catch {}
-  // SPA遷移より確実に反映したい時はハード遷移にする
+  // 確実に反映するためハード遷移
   location.href = to;
 }
 
-/** ===== スケール行 ===== */
+/** ===== スケール行（丸ボタン・数値非表示） ===== */
 function ScaleRow({ pair, value, onChange }) {
   const nums = [1,2,3,4,5];
   return (
@@ -106,7 +106,7 @@ function ScaleRow({ pair, value, onChange }) {
   );
 }
 
-/** ===== セグメント ===== */
+/** ===== セグメント（性別・年齢・グループ） ===== */
 function Segmented({ label, options, value, onChange }) {
   return (
     <div className="seg-row">
@@ -252,6 +252,22 @@ function SurveyPage() {
     setIsSubmitting(true); await postOne(row); setIsSubmitting(false);
     setRecords(prev=>[...prev,row]);
 
+    // === 自分の回答をローカル保存（/image で user_value が無い時のフォールバック用） ===
+    try {
+      const key = `${row.participant_id}::${row.image_id}`;
+      const obj = JSON.parse(sessionStorage.getItem("answersByImage") || "{}");
+      obj[key] = {
+        modest_luxury: row.modest_luxury,
+        colorful_monochrome: row.colorful_monochrome,
+        feminine_masculine: row.feminine_masculine,
+        complex_simple: row.complex_simple,
+        classic_modern: row.classic_modern,
+        soft_hard: row.soft_hard,
+        heavy_light: row.heavy_light,
+      };
+      sessionStorage.setItem("answersByImage", JSON.stringify(obj));
+    } catch {}
+
     if (index+1 < images.length) { setIndex(i=>i+1); resetValuesForNext(); }
     else { setIndex(images.length); window.scrollTo({top:0,behavior:"smooth"}); }
   };
@@ -277,16 +293,15 @@ function SurveyPage() {
     setIndex(0);
     setRecords([]);
 
-    // ★ participant_id 再発行
+    // ★ participant_id 再発行 → 確実に新IDで再スタート
     const newPid = "p_" + uid();
     try { sessionStorage.setItem("participant_id", newPid); } catch {}
 
-    // ?pid, ?group を消してトップへ（lockedByQuery なら group は維持）
+    // ?pid, ?group を消してトップへ（lockedByQuery の場合は group 維持）
     if (!lockedByQuery) {
       const base = location.pathname; // "/"
       history.replaceState(null, "", base);
     }
-    // 確実に新ID反映
     location.reload();
   };
 
@@ -369,7 +384,7 @@ function SurveyPage() {
           <p style={{color:"#666", marginTop:0, marginBottom:24}}>ご協力に感謝いたします。</p>
           <div className="submit-bar" style={{ marginTop:8 }}>
             <button type="button" className="btn-secondary" onClick={handleResetAll}>最初からやり直す</button>
-            {/* ここは SPA Link でも良いが、pid更新を確実にしたいのでハード遷移 */}
+            {/* ここは pid 更新を確実にしたいのでハード遷移 */}
             <button type="button" className="btn-primary" onClick={() => renewParticipantAndGo(`/results?g=${groupId}`)}>
               みんなの結果を見る
             </button>
@@ -380,7 +395,7 @@ function SurveyPage() {
   );
 }
 
-/** ===== 結果一覧："/results" ===== */
+/** ===== 結果一覧："/results"（フロント定義から確実に表示） ===== */
 function ResultsPage() {
   const [searchParams] = useSearchParams();
   const g = Number(searchParams.get("g") || "1");
@@ -461,8 +476,28 @@ function ImagePage() {
         const json = await r.json();
 
         setDist(json || null);
-        setUserValue(json?.user_value || null);
 
+        // --- user_value: サーバ値が無ければローカルフォールバック ---
+        let uv = json?.user_value || null;
+        if (!uv) {
+          try {
+            const obj = JSON.parse(sessionStorage.getItem("answersByImage") || "{}");
+            const local = obj[`${pid}::${String(image_id)}`];
+            if (local) uv = local;
+          } catch {}
+        }
+        if (uv) {
+          const norm = {};
+          for (const k of ["modest_luxury","colorful_monochrome","feminine_masculine","complex_simple","classic_modern","soft_hard","heavy_light"]) {
+            const v = uv[k];
+            norm[k] = (v == null ? null : Number(v));
+          }
+          setUserValue(norm);
+        } else {
+          setUserValue(null);
+        }
+
+        // 画像パスの解決（API→固定マップ→セッションキャッシュ）
         let p = json?.image || json?.image_path || null;
         if (!p) p = ID_TO_PATH[Number(image_id)] || null;
         if (!p) {
@@ -489,26 +524,32 @@ function ImagePage() {
     { key:"heavy_light", left:"重い", right:"軽い" },
   ];
 
-  // レスポンシブSVG + 自分の回答にマーカー（▼）
+  // --- 自分の値を黄色に塗る版の棒グラフ ---
   const BarRow = ({ pair, bins, myVal }) => {
     const max = Math.max(1, ...bins);
     const W = 360, H = 120, pad = 8;
     const colW = (W - pad*2) / 5;
+    const my = Number(myVal); // 型ゆれ対策
 
     const rects = bins.map((n,i)=>{
-      const h = Math.round((n/max)*(H - pad*2 - 18));
+      const h = Math.round((n/max) * (H - pad*2 - 18));
       const x = pad + i*colW + colW*0.15;
       const bw = colW*0.7;
       const y = H - pad - h;
-      const isUser = myVal === (i+1);
+      const isUser = my === (i + 1);
       const color = isUser ? "#facc15" : "#2563eb"; // 自分の評価は黄色
       return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" fill="${color}" />`;
     }).join("");
 
-    const svg = {__html:`<svg viewBox="0 0 ${W} ${H}" width="100%" height="auto">${rects}</svg>`};
+    const svg = {
+      __html:
+        `<svg viewBox="0 0 ${W} ${H}" width="100%" height="auto" preserveAspectRatio="xMidYMid meet">
+           ${rects}
+         </svg>`
+    };
 
-      return (
-        <div className="row">
+    return (
+      <div className="row">
         <div className="label left">{pair.left}</div>
         <div className="bars">
           <div dangerouslySetInnerHTML={svg} />
@@ -547,7 +588,7 @@ function ImagePage() {
 
       <div className="submit-bar">
         <Link to={`/results?g=${g}`} className="btn-secondary as-link">一覧に戻る</Link>
-        {/* ★ ここも pid 再発行してからアンケートへ */}
+        {/* ★ アンケートへ戻る時も pid 再発行 */}
         <button className="btn-primary" onClick={() => renewParticipantAndGo("/")}>
           アンケートへ
         </button>
