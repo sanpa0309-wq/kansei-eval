@@ -1,28 +1,25 @@
-// @ts-nocheck
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ status: "error", message: "Method Not Allowed" });
-  }
+export const config = { runtime: 'edge' };
 
+export default async function handler(req) {
   try {
-    const GAS_ENDPOINT = process.env.GAS_ENDPOINT;
-    if (!GAS_ENDPOINT) throw new Error("Missing GAS_ENDPOINT env");
-
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-
-    // そのまま GAS に中継
-    const r = await fetch(GAS_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ status: 'error', message: 'method not allowed' }), { status: 405 });
+    }
+    const APPSCRIPT_URL = process.env.APPSCRIPT_URL;
+    if (!APPSCRIPT_URL) {
+      return new Response(JSON.stringify({ status: 'error', message: 'APPSCRIPT_URL missing' }), { status: 500 });
+    }
+    const body = await req.json();
+    const res = await fetch(APPSCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
-
-    const text = await r.text(); // GAS はテキストJSONを返す運用
-    res.setHeader("Content-Type", "application/json");
-    return res.status(200).send(text);
+    const text = await res.text();
+    return new Response(text || '{"status":"ok"}', { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
-    return res
-      .status(500)
-      .json({ status: "error", message: (err && err.message) || String(err) });
+    return new Response(JSON.stringify({ status: 'error', message: String(err?.message || err) }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

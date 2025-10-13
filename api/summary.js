@@ -1,56 +1,31 @@
-// @ts-nocheck
-export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ status: "error", message: "Method Not Allowed" });
-  }
+export const config = { runtime: 'edge' };
 
+export default async function handler(req) {
   try {
-    const GAS_ENDPOINT = process.env.GAS_ENDPOINT;
-    if (!GAS_ENDPOINT) throw new Error("Missing GAS_ENDPOINT env");
+    const { searchParams } = new URL(req.url);
+    const mode = searchParams.get('mode') || '';
+    const g = searchParams.get('g') || '';
+    const image_id = searchParams.get('image_id') || '';
+    const pid = searchParams.get('pid') || '';
 
-    // クエリ取得（Vercel は req.query が使える）
-    const q = v => Array.isArray(v) ? v[0] : v;
-    const mode = q(req.query.mode);
-    const g    = q(req.query.g);
-    const image_id = q(req.query.image_id);
-    const image    = q(req.query.image);
-
-    const url = new URL(GAS_ENDPOINT);
-
-    if (mode === "list") {
-      if (!g) return bad(res, "require g");
-      url.searchParams.set("action", "summaryListByGroup");
-      url.searchParams.set("g", String(g));
-    } else if (mode === "image") {
-      if (!g) return bad(res, "require g");
-      url.searchParams.set("action", "summaryByImage");
-      url.searchParams.set("g", String(g));
-      if (image_id) {
-        url.searchParams.set("image_id", String(image_id));
-      } else if (image) {
-        url.searchParams.set("img", String(image));
-      } else {
-        return bad(res, "require image_id or image");
-      }
-    } else {
-      return bad(res, "unknown mode");
+    const APPSCRIPT_URL = process.env.APPSCRIPT_URL;
+    if (!APPSCRIPT_URL) {
+      return new Response(JSON.stringify({ status: 'error', message: 'APPSCRIPT_URL missing' }), { status: 500 });
     }
 
-    const r = await fetch(url.toString(), {
-      method: "GET",
-      headers: { Accept: "application/json" }
-    });
+    const url = new URL(APPSCRIPT_URL);
+    url.searchParams.set('action', 'summary');
+    if (mode) url.searchParams.set('mode', mode);
+    if (g) url.searchParams.set('g', g);
+    if (image_id) url.searchParams.set('image_id', image_id);
+    if (pid) url.searchParams.set('pid', pid);
 
-    const text = await r.text();
-    res.setHeader("Content-Type", "application/json");
-    return res.status(200).send(text);
+    const res = await fetch(url.toString(), { method: 'GET' });
+    const text = await res.text();
+    return new Response(text, { status: res.ok ? 200 : 500, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
-    return res
-      .status(500)
-      .json({ status: "error", message: (err && err.message) || String(err) });
+    return new Response(JSON.stringify({ status: 'error', message: String(err?.message || err) }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
   }
-}
-
-function bad(res, msg) {
-  return res.status(400).json({ status: "error", message: msg });
 }
