@@ -59,22 +59,6 @@ const IMAGE_ID_MAP = (() => {
 })();
 const ID_TO_PATH = Object.fromEntries(Object.entries(IMAGE_ID_MAP).map(([p,id]) => [id, p]));
 
-/** ===== Cookie helpers（groupローテ用） ===== */
-function getCookie(name) {
-  if (typeof document === "undefined") return null;
-  const arr = document.cookie ? document.cookie.split(";") : [];
-  for (const raw of arr) {
-    const [k, ...rest] = raw.trim().split("=");
-    if (decodeURIComponent(k) === name) return decodeURIComponent(rest.join("="));
-  }
-  return null;
-}
-function setCookie(name, value, days = 365) {
-  if (typeof document === "undefined") return;
-  const d = new Date(); d.setTime(d.getTime() + days * 864e5);
-  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; path=/; expires=${d.toUTCString()}`;
-}
-
 /** ===== ユーティリティ ===== */
 const uid = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 const shuffle = (arr) => { const a = arr.slice(); for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
@@ -85,8 +69,20 @@ const AGE_CODE = { "0-9":1,"10-19":2,"20-29":3,"30-39":4,"40-49":5,"50-59":6,"60
 function renewParticipantAndGo(to) {
   const newPid = "p_" + uid();
   try { sessionStorage.setItem("participant_id", newPid); } catch {}
-  // 確実に反映するためハード遷移
   location.href = to;
+}
+
+/** ===== ラベル文字サイズ（標準/大/特大） ===== */
+const FONT_PRESETS = {
+  normal: { label: "標準", labelFs: "15px", guideFs: "12px" },
+  large:  { label: "大",   labelFs: "18px", guideFs: "13px" },
+  xlarge: { label: "特大", labelFs: "20px", guideFs: "14px" },
+};
+function applyFontPreset(key) {
+  const p = FONT_PRESETS[key] || FONT_PRESETS.normal;
+  const root = document.documentElement;
+  root.style.setProperty("--label-fs", p.labelFs);
+  root.style.setProperty("--guide-fs", p.guideFs);
 }
 
 /** ===== スケール行（丸ボタン・数値非表示） ===== */
@@ -106,7 +102,7 @@ function ScaleRow({ pair, value, onChange }) {
   );
 }
 
-/** ===== セグメント（性別・年齢・グループ） ===== */
+/** ===== セグメント（性別・年齢） ===== */
 function Segmented({ label, options, value, onChange }) {
   return (
     <div className="seg-row">
@@ -126,39 +122,48 @@ function Segmented({ label, options, value, onChange }) {
 /** ===== アンケート："/" ===== */
 function SurveyPage() {
   const [groupId, setGroupId] = useState(null);
-  const [lockedByQuery, setLockedByQuery] = useState(false);
   const [participantId, setParticipantId] = useState("anon");
+  const [fontKey, setFontKey] = useState("normal");
 
+  // 文字サイズ初期化
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-
-    // --- group 決定（?group=優先、無ければ cookie ローテ） ---
-    const qg = params.get("group");
-    const g = qg ? parseInt(qg, 10) : null;
-    if (g && g >= 1 && g <= 5) {
-      setGroupId(g);
-      setLockedByQuery(true);
-    } else {
-      const last = parseInt(getCookie("lastGroup") || "0", 10);
-      const next = ((isNaN(last) ? 0 : last) % 5) + 1;
-      setGroupId(next);
-      setCookie("lastGroup", String(next));
-    }
-
-    // --- participant_id は sessionStorage（タブ単位） ---
     try {
-      const urlPid = params.get("pid");
-      if (urlPid) {
-        sessionStorage.setItem("participant_id", urlPid);
-        setParticipantId(urlPid);
-      } else {
-        let pid = sessionStorage.getItem("participant_id");
-        if (!pid) {
-          pid = "p_" + uid();
-          sessionStorage.setItem("participant_id", pid);
+      const stored = localStorage.getItem("fontKey");
+      const key = stored && FONT_PRESETS[stored] ? stored : "normal";
+      setFontKey(key);
+      applyFontPreset(key);
+    } catch {
+      setFontKey("normal");
+      applyFontPreset("normal");
+    }
+  }, []);
+
+  // グループの決定（サーバでグローバル管理）
+  useEffect(() => {
+    const decideGroup = async () => {
+      try {
+        const r = await fetch(`${API_BASE}/group`);
+        const j = await r.json(); // { ok:true, group: 1..5 }
+        if (j && Number.isFinite(Number(j.group))) {
+          setGroupId(Number(j.group));
+        } else {
+          // フォールバック（万一）
+          setGroupId(1);
         }
-        setParticipantId(pid);
+      } catch {
+        setGroupId(1);
       }
+    };
+    decideGroup();
+
+    // participant_id はタブ単位
+    try {
+      let pid = sessionStorage.getItem("participant_id");
+      if (!pid) {
+        pid = "p_" + uid();
+        sessionStorage.setItem("participant_id", pid);
+      }
+      setParticipantId(pid);
     } catch {
       const pid = "p_" + uid();
       setParticipantId(pid);
@@ -236,9 +241,9 @@ function SurveyPage() {
       participant_id: participantId,
       group_id: groupId,
       trial_no: trialNo,
-      image_id: imageIdFromPath(currentImage),
-      gender: GENDER_CODE[gender] ?? 0,
-      age_bucket: AGE_CODE[ageBucket] ?? 0,
+      image_id: Number(imageIdFromPath(currentImage)),
+      gender: Number(GENDER_CODE[gender] ?? 0),
+      age_bucket: Number(AGE_CODE[ageBucket] ?? 0),
       modest_luxury: values.modest_luxury,
       colorful_monochrome: values.colorful_monochrome,
       feminine_masculine: values.feminine_masculine,
@@ -252,8 +257,7 @@ function SurveyPage() {
     setIsSubmitting(true); await postOne(row); setIsSubmitting(false);
     setRecords(prev=>[...prev,row]);
 
-    // === 自分の回答をローカル保存（/image で user_value が無い時のフォールバック用） ===
-    // === 自分の回答をローカル保存（/image での黄色フォールバック） ===
+    // 自分の回答をローカル保存（/image での黄色フォールバック）
     try {
       const byPidKey = `${row.participant_id}::${row.image_id}`;
       const byPid = JSON.parse(sessionStorage.getItem("answersByImage") || "{}");
@@ -267,13 +271,10 @@ function SurveyPage() {
         heavy_light: row.heavy_light,
       };
       sessionStorage.setItem("answersByImage", JSON.stringify(byPid));
-
-      // ★ image_id 単位でも直近回答を保存（IDが変わっても拾える）
       const byImage = JSON.parse(sessionStorage.getItem("answersByImageLatest") || "{}");
       byImage[String(row.image_id)] = byPid[byPidKey];
       sessionStorage.setItem("answersByImageLatest", JSON.stringify(byImage));
     } catch {}
-
 
     if (index+1 < images.length) { setIndex(i=>i+1); resetValuesForNext(); }
     else { setIndex(images.length); window.scrollTo({top:0,behavior:"smooth"}); }
@@ -293,22 +294,13 @@ function SurveyPage() {
   };
 
   const handleResetAll = () => {
-    // UIリセット
     setValues(initialValues);
     setGender("na");
     setAgeBucket("");
     setIndex(0);
     setRecords([]);
-
-    // ★ participant_id 再発行 → 確実に新IDで再スタート
     const newPid = "p_" + uid();
     try { sessionStorage.setItem("participant_id", newPid); } catch {}
-
-    // ?pid, ?group を消してトップへ（lockedByQuery の場合は group 維持）
-    if (!lockedByQuery) {
-      const base = location.pathname; // "/"
-      history.replaceState(null, "", base);
-    }
     location.reload();
   };
 
@@ -317,37 +309,43 @@ function SurveyPage() {
 
   return (
     <div className="page">
+      {/* 文字サイズの即時反映用インラインルール（index.cssの後に読むので上書き可能） */}
+      <style>{`
+        .label-left, .label-right { font-size: var(--label-fs, 15px) !important; }
+        .head-grid-5 span { font-size: var(--guide-fs, 12px) !important; }
+      `}</style>
+
       <header className="topbar">
         <h1 className="title">感性評価</h1>
         <p className="subtitle">
-          {groupId ? `グループ: ${groupId} ／ 画像 ${Math.min(index+1, images.length)} / ${images.length}` 
-                   : "最初に評価グループを選んでください"}
+          {groupId ? `グループ: ${groupId} ／ 画像 ${Math.min(index+1, images.length)} / ${images.length}` : "グループ決定中…"}
         </p>
       </header>
 
-      {!groupId && (
-        <section className="card">
-          <Segmented
-            label="評価グループ"
-            options={[1,2,3,4,5].map(n=>({label:String(n), value:n}))}
-            value={null}
-            onChange={(g)=>{
-              setGroupId(g);
-              const p = new URLSearchParams(location.search); p.set("group", String(g));
-              history.replaceState(null,"",`${location.pathname}?${p.toString()}`);
-              setIndex(0); setRecords([]); setValues(initialValues); setCookie("lastGroup", String(g));
-            }}
-          />
-        </section>
-      )}
+      {/* 文字サイズ切り替え（老人向け） */}
+      <section className="card" style={{ paddingTop: 10, paddingBottom: 10 }}>
+        <div className="seg-row">
+          <div className="seg-label">文字サイズ</div>
+          <div className="seg-wrap">
+            {Object.entries(FONT_PRESETS).map(([key, conf]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={fontKey===key}
+                onClick={() => { setFontKey(key); applyFontPreset(key); try{localStorage.setItem("fontKey", key);}catch{} }}
+                className={`pill seg-pill ${fontKey===key ? "pill--active":""}`}
+              >
+                {conf.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
+      {/* アンケート本編 or サンクス */}
       {groupId && !allDone && (
         <>
           <section className="card">
-            <div className="card-head">
-              <strong>タンブラー画像</strong>
-              {!lockedByQuery && <button type="button" className="btn-ghost" onClick={()=>setGroupId(null)}>グループ変更</button>}
-            </div>
             <div className="img-wrap">
               {currentImage ? <img src={currentImage} alt="タンブラー画像" className="stimulus" /> :
                 <div style={{padding:16,color:"#666",fontSize:14}}>画像が見つかりません</div>}
@@ -391,11 +389,7 @@ function SurveyPage() {
           <p style={{color:"#666", marginTop:0, marginBottom:24}}>ご協力に感謝いたします。</p>
           <div className="submit-bar" style={{ marginTop:8 }}>
             <button type="button" className="btn-secondary" onClick={handleResetAll}>最初からやり直す</button>
-            {/* ここは pid 更新を確実にしたいのでハード遷移 */}
-            <Link className="btn-primary as-link" to={`/results?g=${groupId}`}>
-                みんなの結果を見る
-            </Link>
-
+            <Link className="btn-primary as-link" to={`/results?g=${groupId}`}>みんなの結果を見る</Link>
           </div>
         </section>
       )}
@@ -403,7 +397,7 @@ function SurveyPage() {
   );
 }
 
-/** ===== 結果一覧："/results"（フロント定義から確実に表示） ===== */
+/** ===== 結果一覧："/results" ===== */
 function ResultsPage() {
   const [searchParams] = useSearchParams();
   const g = Number(searchParams.get("g") || "1");
@@ -415,7 +409,6 @@ function ResultsPage() {
         <h1>グループ {String(searchParams.get("g") || "")} の結果</h1>
         <section className="card">不正なグループです。</section>
         <div style={{ marginTop: 16 }}>
-          {/* ここも pid 更新してから戻る */}
           <button className="btn-secondary" onClick={() => renewParticipantAndGo("/")}>アンケートに戻る</button>
         </div>
       </div>
@@ -431,7 +424,6 @@ function ResultsPage() {
             const image_id = IMAGE_ID_MAP[imgPath];
             if (image_id == null) return null;
             const href = `/image?g=${g}&image_id=${encodeURIComponent(image_id)}`;
-
             const rememberPath = () => {
               try {
                 const map = JSON.parse(sessionStorage.getItem("imgMap") || "{}");
@@ -439,22 +431,15 @@ function ResultsPage() {
                 sessionStorage.setItem("imgMap", JSON.stringify(map));
               } catch {}
             };
-
             return (
               <a className="card-thumb" href={href} key={image_id} onClick={rememberPath}>
-                <div className="thumb">
-                  <img loading="lazy" src={imgPath} alt="" />
-                </div>
+                <div className="thumb"><img loading="lazy" src={imgPath} alt="" /></div>
               </a>
             );
           })}
         </div>
-
         <div style={{ marginTop: 16 }}>
-          {/* ★ アンケートへ戻る時も pid 再発行 */}
-          <button className="btn-secondary" onClick={() => renewParticipantAndGo("/")}>
-            アンケートに戻る
-          </button>
+          <button className="btn-secondary" onClick={() => renewParticipantAndGo("/")}>アンケートに戻る</button>
         </div>
       </section>
     </div>
@@ -482,14 +467,12 @@ function ImagePage() {
 
         const r = await fetch(url.toString());
         const json = await r.json();
-
         setDist(json || null);
 
-        // --- user_value: サーバ値 → (pid,image) ローカル → image 単位ローカル の順に探す ---
+        // user_value: サーバ → (pid,image)ローカル → imageローカル
         let uv = json?.user_value || null;
         try {
           if (!uv) {
-            const pid = sessionStorage.getItem("participant_id") || "";
             const byPid = JSON.parse(sessionStorage.getItem("answersByImage") || "{}");
             uv = byPid[`${pid}::${String(image_id)}`] || null;
           }
@@ -498,7 +481,6 @@ function ImagePage() {
             uv = byImage[String(image_id)] || null;
           }
         } catch {}
-
         if (uv) {
           const norm = {};
           for (const k of ["modest_luxury","colorful_monochrome","feminine_masculine","complex_simple","classic_modern","soft_hard","heavy_light"]) {
@@ -510,8 +492,6 @@ function ImagePage() {
           setUserValue(null);
         }
 
-
-        // 画像パスの解決（API→固定マップ→セッションキャッシュ）
         let p = json?.image || json?.image_path || null;
         if (!p) p = ID_TO_PATH[Number(image_id)] || null;
         if (!p) {
@@ -538,50 +518,36 @@ function ImagePage() {
     { key:"heavy_light", left:"重い", right:"軽い" },
   ];
 
-  // --- 自分の値を黄色に塗る版の棒グラフ ---
-  // --- ここから BarRow 置換 ---
+  // 自分の値を黄色で塗る棒グラフ（SVG）
   const BarRow = ({ pair, bins, myVal }) => {
     const max = Math.max(1, ...bins);
     const W = 360, H = 120, pad = 8;
     const colW = (W - pad * 2) / 5;
-    const my = Number(myVal); // 型ゆれ対策
-
-    const rects = bins
-      .map((n, i) => {
-        const h = Math.round((n / max) * (H - pad * 2 - 18));
-        const x = pad + i * colW + colW * 0.15;
-        const bw = colW * 0.7;
-        const y = H - pad - h;
-        const isUser = my === (i + 1);
-        const color = isUser ? "#facc15" : "#2563eb"; // 自分だけ黄色
-        return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" fill="${color}" />`;
-      })
-      .join("");
-
-    const svg = {
-      __html: `
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
-            style="width:100%;height:auto;display:block">
-          ${rects}
-        </svg>
-      `,
-    };
-
+    const my = Number(myVal);
+    const rects = bins.map((n,i)=>{
+      const h = Math.round((n/max) * (H - pad*2 - 18));
+      const x = pad + i*colW + colW*0.15;
+      const bw = colW*0.7;
+      const y = H - pad - h;
+      const isUser = my === (i + 1);
+      const color = isUser ? "#facc15" : "#2563eb";
+      return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" ry="3" fill="${color}" />`;
+    }).join("");
+    const svg = { __html:
+      `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">
+         ${rects}
+       </svg>` };
     return (
       <div className="row">
         <div className="label left">{pair.left}</div>
         <div className="bars">
           <div dangerouslySetInnerHTML={svg} />
-          <div className="ticks">
-            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
-          </div>
+          <div className="ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
         </div>
         <div className="label right">{pair.right}</div>
       </div>
     );
   };
-
-  // --- ここまで BarRow 置換 ---
 
   const rows = (dist && dist.counts)
     ? PAIRS.map(p=>{
@@ -604,25 +570,18 @@ function ImagePage() {
           {meta.path ? <img src={meta.path} alt="" className="stimulus" /> : <div className="ph">画像なし</div>}
         </div>
       </section>
-      <p style={{
-        textAlign: "center",
-        marginTop: "8px",
-        marginBottom: "12px",
-        fontSize: "14px",
-        color: "#666"
-      }}>
+
+      <p style={{ textAlign: "center", marginTop: 8, marginBottom: 12, fontSize: 14, color: "#666" }}>
         ※黄色のグラフがあなたの回答
-      </p>      
-              <section className="card rows-card">
+      </p>
+
+      <section className="card rows-card">
         {rows}
       </section>
 
       <div className="submit-bar">
         <Link to={`/results?g=${g}`} className="btn-secondary as-link">一覧に戻る</Link>
-        {/* ★ アンケートへ戻る時も pid 再発行 */}
-        <button className="btn-primary" onClick={() => renewParticipantAndGo("/")}>
-          アンケートへ
-        </button>
+        <button className="btn-primary" onClick={() => renewParticipantAndGo("/")}>アンケートへ</button>
       </div>
     </div>
   );
