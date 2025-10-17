@@ -418,6 +418,10 @@ function ResultsPage() {
   return (
     <div className="page results">
       <h1>グループ {g} の結果</h1>
+       {/* ← 追加：案内テキスト（分布ページの注記と同じ大きさ/色） */}
+      <p style={{ textAlign: "center", marginTop: 8, marginBottom: 12, fontSize: 14, color: "#666" }}>
+        結果が気になる画像をタップしてください。
+      </p>
       <section className="card">
         <div className="grid">
           {images.map((imgPath) => {
