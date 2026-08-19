@@ -1,0 +1,311 @@
+/***** ===== 設定ここから ===== *****/
+const SHEET_NAME = 'Responses';   // ← 保存先のシート名（無ければ自動作成）
+const USE_CACHE  = true;          // 集計の簡易キャッシュ
+const CACHE_SEC  = 15;            // 集計キャッシュ秒数（軽さ優先で短め）
+
+// 5段階・感性語キー（フロントと厳密一致）
+const PAIRS = [
+  { key:'modest_luxury'       },
+  { key:'colorful_monochrome' },
+  { key:'feminine_masculine'  },
+  { key:'complex_simple'      },
+  { key:'classic_modern'      },
+  { key:'soft_hard'           },
+  { key:'heavy_light'         },
+];
+/***** ===== 設定ここまで ===== *****/
+
+/** ===== 共通：JSON出力 ===== */
+function _json(obj, status) {
+  var out = ContentService.createTextOutput(JSON.stringify(obj));
+  out.setMimeType(ContentService.MimeType.JSON);
+  // Apps Script の doGet/doPost はステータスコードを細かく返せない（常に200）
+  // 必要があれば JSON 内に status を入れる
+  return out;
+}
+
+/** ===== 型補助 ===== */
+function toInt(v, def) {
+  var n = Number(v);
+  return (isFinite(n) ? Math.floor(n) : def);
+}
+
+/** ===== シート準備：ヘッダー＆列フォーマットを1回だけ適用 ===== */
+function getSheetReady_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+
+  var headers = [
+    'timestamp','participant_id','group_id','trial_no','image_id',
+    'gender','age_bucket',
+    'modest_luxury','colorful_monochrome','feminine_masculine',
+    'complex_simple','classic_modern','soft_hard','heavy_light',
+    'key'
+  ];
+
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(headers);
+    ensureColumnFormats_(sh, headers);  // ★ 列の表示形式を固定（12-31 問題対策）
+  } else {
+    // 念のため、既存シートでもヘッダーが欠けていたら補修
+    var cur = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(String);
+    var needFix = headers.some(function(h, i){ return (cur[i] !== h); });
+    if (needFix) {
+      sh.getRange(1,1,1,headers.length).setValues([headers]);
+      ensureColumnFormats_(sh, headers);
+    }
+  }
+  return { ss:ss, sh:sh, headers:headers };
+}
+
+/** 列の表示形式固定：数値=0 / 文字列=@ */
+function ensureColumnFormats_(sh, headers) {
+  var lastRow = Math.max(2, sh.getMaxRows());
+  var col = function(name){ return headers.indexOf(name) + 1; };
+
+  // 数値コード列や5段階評価は「0」に固定（＝日付化されない）
+  [
+    'group_id','trial_no','image_id','gender','age_bucket',
+    'modest_luxury','colorful_monochrome','feminine_masculine',
+    'complex_simple','classic_modern','soft_hard','heavy_light'
+  ].forEach(function(name){
+    var c = col(name);
+    if (c > 0) sh.getRange(2, c, lastRow-1, 1).setNumberFormat('0');
+  });
+
+  // 文字列列（ID類）は「@」
+  ['participant_id','key','timestamp'].forEach(function(name){
+    var c = col(name);
+    if (c > 0) sh.getRange(2, c, lastRow-1, 1).setNumberFormat('@');
+  });
+}
+
+/** ====== 受信：フロントの fetch POST(JSON) を受けて1行追記 ====== */
+function doPost(e) {
+  try {
+    var body = (e && e.postData && e.postData.contents) ? JSON.parse(e.postData.contents) : null;
+    if (!body) return _json({ status:'error', message:'no body' });
+
+    // シート準備
+    var env = getSheetReady_();
+    var sh = env.sh;
+    var headers = env.headers;
+
+    // 軽い正規化（フロントで数値化済みが前提、保険で整える）
+    body.timestamp     = String(body.timestamp || new Date().toISOString());
+    body.participant_id= String(body.participant_id || '');
+    body.group_id      = toInt(body.group_id, 0);
+    body.trial_no      = toInt(body.trial_no, 0);
+    body.image_id      = toInt(body.image_id, 0);
+    body.gender        = toInt(body.gender, 0);
+    body.age_bucket    = toInt(body.age_bucket, 0);
+
+    PAIRS.forEach(function(p){
+      body[p.key] = toInt(body[p.key], 0);
+    });
+
+    // 簡易重複ガード（key 完全一致でスキップ）
+    var keyIdx = headers.indexOf('key');
+    if (keyIdx >= 0 && body.key) {
+      var existing = sh.getRange(2, keyIdx+1, Math.max(0, sh.getLastRow()-1), 1).getValues().map(function(r){return String(r[0]);});
+      if (existing.indexOf(String(body.key)) !== -1) {
+        return _json({ status:'dup' });
+      }
+    }
+
+    // 行組み立て（無いキーは空文字/0）
+    var row = headers.map(function(h){
+      return (body[h] != null ? body[h] : (h==='participant_id'||h==='key'||h==='timestamp' ? '' : 0));
+    });
+    sh.appendRow(row);
+
+    return _json({ status:'ok' });
+  } catch (err) {
+    return _json({ status:'error', message:String(err) });
+  }
+}
+
+/** ====== API：GET ====== */
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  var action = p.action;
+
+  if (action === 'health') {
+    return _json({ ok:true, now: Date.now() });
+  }
+
+  if (action === 'nextGroup') {
+    return nextGroup_();
+  }
+
+  if (action === 'summary') {
+    return summary_(p);
+  }
+
+  // そのほかは受け付けない（旧ダッシュボード等は廃止）
+  return _json({ status:'error', message:'unknown action' });
+}
+
+/** ====== グローバル順番（1..5） ======
+ * ScriptProperties に last_group を保存し、LockService で排他して ++
+ * レスポンス: { ok:true, group:1..5, ts: <epoch> }
+ */
+function nextGroup_() {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.tryLock(5000);
+    var props = PropertiesService.getScriptProperties();
+    var last = parseInt(props.getProperty('last_group') || '0', 10);
+    var next = (isNaN(last) || last < 1 || last > 5) ? 1 : ((last % 5) + 1);
+    props.setProperty('last_group', String(next));
+    return _json({ ok:true, group: next, ts: Date.now() });
+  } catch (err) {
+    return _json({ ok:false, error: String(err) });
+  } finally {
+    try { lock.releaseLock(); } catch (_){}
+  }
+}
+
+/** ====== 分布集計API ======
+ * クエリ:
+ *   mode=image （写真別集計）
+ *   g=1..5    （グループ番号）
+ *   image_id  （数値ID）※必須
+ *   pid       （任意：同一参加者の自分の最新回答を返すため）
+ *
+ * レスポンス例:
+ * {
+ *   image_id: 103,
+ *   total: 12,
+ *   counts: {
+ *     modest_luxury:       {"1":n,"2":n,"3":n,"4":n,"5":n},
+ *     colorful_monochrome: {...},
+ *     ...
+ *   },
+ *   user_value: { ... } | null
+ * }
+ */
+function summary_(p) {
+  var mode = String(p.mode || 'image');
+  if (mode !== 'image') {
+    return _json({ status:'error', message:'unsupported mode' });
+  }
+
+  var groupFilter = (p.g != null && p.g !== '') ? String(p.g).trim() : null;
+  var imageId = toInt(p.image_id, 0);
+  if (!imageId) {
+    return _json({ status:'error', message:'missing image_id' });
+  }
+  var pid = (p.pid != null && p.pid !== '') ? String(p.pid) : null;
+
+  // キャッシュキー
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'sum:img:' + imageId + ':g:' + (groupFilter || 'ALL');
+  if (USE_CACHE) {
+    var cached = cache.get(cacheKey);
+    if (cached) {
+      var obj = JSON.parse(cached);
+      // user_value はユーザ依存なので、ここでは別途付与（キャッシュは全体分布のみ）
+      if (pid) {
+        obj.user_value = findUserValue_(imageId, pid);
+      } else {
+        obj.user_value = null;
+      }
+      return _json(obj);
+    }
+  }
+
+  // 読み込み
+  var env = getSheetReady_();
+  var sh  = env.sh;
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) {
+    var empty = { image_id: imageId, total: 0, counts: pairsEmpty_(), user_value: null };
+    return _json(empty);
+  }
+  var header = values[0].map(String);
+  var idx = {}; header.forEach(function(h,i){ idx[h]=i; });
+
+  // 必須列チェック
+  var need = ['image_id'].concat(PAIRS.map(function(p){return p.key;}));
+  for (var ni=0; ni<need.length; ni++) {
+    if (!(need[ni] in idx)) {
+      return _json({ status:'error', message:'missing column: '+need[ni] });
+    }
+  }
+
+  var rows = values.slice(1).filter(function(r){
+    var iid = Number(r[idx['image_id']] || 0);
+    if (iid !== imageId) return false;
+    if (groupFilter != null && groupFilter !== '') {
+      var cell = String(r[idx['group_id']] || '').trim().replace(/\.0$/, '');
+      var q    = String(groupFilter).trim();
+      if (cell !== q) return false;
+    }
+    return true;
+  });
+
+  // 集計
+  var counts = pairsEmpty_();
+  var total  = 0;
+  rows.forEach(function(r){
+    total += 1;
+    PAIRS.forEach(function(p){
+      var v = Number(r[idx[p.key]] || 0);
+      if (v>=1 && v<=5) {
+        counts[p.key][String(v)] += 1;
+      }
+    });
+  });
+
+  var result = {
+    image_id: imageId,
+    total: total,
+    counts: counts,
+    user_value: pid ? findUserValue_(imageId, pid) : null
+  };
+
+  if (USE_CACHE) {
+    var cacheCopy = JSON.stringify({ image_id:imageId, total: total, counts: counts, user_value: null });
+    cache.put(cacheKey, cacheCopy, CACHE_SEC);
+  }
+  return _json(result);
+}
+
+/** 空の分布オブジェクト（各5ビン0） */
+function pairsEmpty_() {
+  var o = {};
+  PAIRS.forEach(function(p){
+    o[p.key] = {'1':0,'2':0,'3':0,'4':0,'5':0};
+  });
+  return o;
+}
+
+/** 特定 participant_id × image_id の最新回答（自分の値）を返す */
+function findUserValue_(imageId, pid) {
+  var env = getSheetReady_();
+  var sh  = env.sh;
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) return null;
+
+  var header = values[0].map(String);
+  var idx = {}; header.forEach(function(h,i){ idx[h]=i; });
+
+  if (!('participant_id' in idx) || !('image_id' in idx)) return null;
+
+  // 下から走査して最新を拾う（appendRow のため末尾が新しい）
+  for (var i = values.length - 1; i >= 1; i--) {
+    var r = values[i];
+    var iid = Number(r[idx['image_id']] || 0);
+    var pp  = String(r[idx['participant_id']] || '');
+    if (iid === imageId && pp === pid) {
+      var out = {};
+      for (var j=0; j<PAIRS.length; j++) {
+        var k = PAIRS[j].key;
+        out[k] = toInt(r[idx[k]] || 0, 0) || null;
+      }
+      return out;
+    }
+  }
+  return null;
+}
